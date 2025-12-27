@@ -398,6 +398,7 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
 
             // Send email to each mentor with assignments (with timeout)
             const emailPromises = Object.entries(assignmentsByMentor).map(async ([mentorId, mentorAssignments]) => {
+                const emailStart = Date.now(); // Track email latency
                 try {
                     const mentor = await getMentor(mentorId);
                     if (mentor && mentor.email) {
@@ -406,16 +407,20 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
                             setTimeout(() => reject(new Error('Email timeout')), 10000)
                         );
 
-                        await Promise.race([
+                        const emailResult = await Promise.race([
                             sendMentorAssignmentEmail(mentor, mentorAssignments, hackathonName),
                             timeoutPromise
                         ]);
 
+                        const emailLatency = Date.now() - emailStart;
                         emailResults.sent++;
-                        console.log(`Email sent to mentor: ${mentor.email}`);
+                        emailResults.latencies = emailResults.latencies || [];
+                        emailResults.latencies.push(emailLatency);
+                        console.log(`Email sent to mentor: ${mentor.email} (${emailLatency}ms)`);
                     }
                 } catch (emailError) {
-                    console.error(`Failed to send email to mentor ${mentorId}:`, emailError.message);
+                    const emailLatency = Date.now() - emailStart;
+                    console.error(`Failed to send email to mentor ${mentorId}: ${emailError.message} (after ${emailLatency}ms)`);
                     emailResults.failed++;
                     emailResults.errors.push({ mentorId, error: emailError.message });
                 }
@@ -423,6 +428,16 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
 
             // Wait for all emails but don't let it block forever
             await Promise.allSettled(emailPromises);
+
+            // Calculate latency statistics
+            if (emailResults.latencies && emailResults.latencies.length > 0) {
+                emailResults.avgLatencyMs = Math.round(
+                    emailResults.latencies.reduce((a, b) => a + b, 0) / emailResults.latencies.length
+                );
+                emailResults.minLatencyMs = Math.min(...emailResults.latencies);
+                emailResults.maxLatencyMs = Math.max(...emailResults.latencies);
+                delete emailResults.latencies; // Don't send raw array to frontend
+            }
         }
 
         res.json({

@@ -14,6 +14,8 @@ export const sendEmail = async ({ to, subject, html }) => {
         // Use verified email from env, or default to Resend's test address
         const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
+        const startTime = Date.now(); // Track email send latency
+
         const result = await resend.emails.send({
             from: `Hackathon Platform <${fromEmail}>`,
             to,
@@ -21,8 +23,13 @@ export const sendEmail = async ({ to, subject, html }) => {
             html
         });
 
-        console.log(`Email sent to ${to}: ${result.id || 'sent'}`);
-        return { success: true, messageId: result.id };
+        const latencyMs = Date.now() - startTime;
+        console.log(`Email sent to ${to}: ${result.id || 'sent'} (${latencyMs}ms)`);
+        return {
+            success: true,
+            messageId: result.id,
+            latencyMs // Return latency for analytics
+        };
     } catch (error) {
         console.error('Email send error:', error);
         throw error;
