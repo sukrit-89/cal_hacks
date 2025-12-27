@@ -24,6 +24,7 @@ import TeamDetail from './pages/participant/TeamDetail';
 import OrganizerDashboard from './pages/organizer/OrganizerDashboard';
 import CreateHackathon from './pages/organizer/CreateHackathon';
 import Analytics from './pages/organizer/Analytics';
+import CheckIn from './pages/organizer/CheckIn';
 
 // Mentor pages
 import MentorDashboard from './pages/mentor/MentorDashboard';
@@ -192,6 +193,14 @@ function App() {
                         element={
                             <ProtectedRoute requiredRole="organizer">
                                 <Analytics />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/organizer/checkin"
+                        element={
+                            <ProtectedRoute requiredRole="organizer">
+                                <CheckIn />
                             </ProtectedRoute>
                         }
                     />

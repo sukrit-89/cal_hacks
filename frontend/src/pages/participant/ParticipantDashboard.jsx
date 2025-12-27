@@ -147,7 +147,9 @@ export const ParticipantDashboard = () => {
                                                 </Button>
                                             </Link>
                                             {team.status === 'accepted' && !team.rsvpStatus && (
-                                                <Button size="sm" className="flex-1">RSVP Now</Button>
+                                                <Link to={`/teams/${team.id}/rsvp`} className="flex-1">
+                                                    <Button size="sm" className="w-full">RSVP Now</Button>
+                                                </Link>
                                             )}
                                         </div>
                                     </Card>

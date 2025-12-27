@@ -297,6 +297,122 @@ router.post('/:id/rsvp', authenticate, isParticipant, async (req, res) => {
     }
 });
 
+// Verify QR code and check-in team (organizer only)
+router.post('/verify-checkin', authenticate, async (req, res) => {
+    try {
+        const { qrData } = req.body;
+
+        if (!qrData) {
+            return res.status(400).json({ error: 'QR data is required' });
+        }
+
+        // Parse QR code data
+        let parsedData;
+        try {
+            parsedData = JSON.parse(qrData);
+        } catch (e) {
+            return res.status(400).json({ error: 'Invalid QR code format' });
+        }
+
+        const { teamId, hackathonId } = parsedData;
+
+        if (!teamId || !hackathonId) {
+            return res.status(400).json({ error: 'Invalid QR code data' });
+        }
+
+        // Get team details
+        const team = await getTeam(teamId);
+        if (!team) {
+            return res.status(404).json({ error: 'Team not found' });
+        }
+
+        // Verify hackathon belongs to organizer
+        const hackathon = await getHackathon(hackathonId);
+        if (!hackathon) {
+            return res.status(404).json({ error: 'Hackathon not found' });
+        }
+
+        if (hackathon.organizerId !== req.user.uid) {
+            return res.status(403).json({ error: 'Not authorized to check-in teams for this hackathon' });
+        }
+
+        // Verify team has RSVP'd
+        if (!team.rsvpStatus) {
+            return res.status(400).json({ error: 'Team has not RSVP\'d' });
+        }
+
+        // Fetch member details
+        const memberDetails = await Promise.all(
+            (team.members || []).map(async (memberId) => {
+                try {
+                    const user = await getUser(memberId);
+                    if (user) {
+                        // Find member's bio if available
+                        const memberBio = (team.teamBios || []).find(bio => bio.userId === memberId);
+                        return {
+                            id: memberId,
+                            displayName: user.displayName || 'Unknown',
+                            email: user.email || '',
+                            isLeader: memberId === team.leaderId,
+                            bio: memberBio?.bio || '',
+                            githubUrl: memberBio?.githubUrl || '',
+                            linkedinUrl: memberBio?.linkedinUrl || ''
+                        };
+                    }
+                    return { id: memberId, displayName: 'Unknown User', email: '', isLeader: false };
+                } catch (err) {
+                    return { id: memberId, displayName: 'Unknown User', email: '', isLeader: false };
+                }
+            })
+        );
+
+        // Check if already checked in
+        if (team.checkedIn) {
+            return res.json({
+                message: 'Team already checked in',
+                alreadyCheckedIn: true,
+                team: {
+                    id: teamId,
+                    teamName: team.teamName,
+                    teamCode: team.teamCode,
+                    memberCount: team.members?.length || 0,
+                    memberDetails: memberDetails,
+                    checkedInAt: team.checkedInAt
+                },
+                hackathon: {
+                    name: hackathon.name
+                }
+            });
+        }
+
+        // Mark team as checked in
+        const checkedInAt = new Date().toISOString();
+        await updateTeam(teamId, {
+            checkedIn: true,
+            checkedInAt: checkedInAt
+        });
+
+        res.json({
+            message: 'Check-in successful',
+            alreadyCheckedIn: false,
+            team: {
+                id: teamId,
+                teamName: team.teamName,
+                teamCode: team.teamCode,
+                memberCount: team.members?.length || 0,
+                memberDetails: memberDetails,
+                checkedInAt: checkedInAt
+            },
+            hackathon: {
+                name: hackathon.name
+            }
+        });
+    } catch (error) {
+        console.error('Check-in error:', error);
+        res.status(500).json({ error: 'Failed to check-in team' });
+    }
+});
+
 // Final submission
 router.post('/:id/final-submit', authenticate, isParticipant, async (req, res) => {
     try {
