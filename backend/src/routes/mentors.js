@@ -255,19 +255,47 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
                     }
 
                     // Sort by current load (using tracker) to find mentor with lowest load
+                    // This ensures automatic load balancing - always picks least loaded mentor
                     const sortedMentors = [...eligibleMentors].sort((a, b) => {
                         const loadA = mentorLoadTracker[a.id] || 0;
                         const loadB = mentorLoadTracker[b.id] || 0;
-                        return loadA - loadB;
+                        // Primary sort: by current load (ascending)
+                        if (loadA !== loadB) {
+                            return loadA - loadB;
+                        }
+                        // Secondary sort: by remaining capacity (descending) - prefer mentors with more room
+                        const remainingA = a.maxLoad - loadA;
+                        const remainingB = b.maxLoad - loadB;
+                        return remainingB - remainingA;
                     });
 
-                    // Find first mentor with available capacity
+                    // Find first mentor with available capacity (already sorted by lowest load)
                     let selectedMentor = null;
                     for (const mentor of sortedMentors) {
                         const currentLoad = mentorLoadTracker[mentor.id] || 0;
                         if (currentLoad < mentor.maxLoad) {
                             selectedMentor = mentor;
                             break;
+                        }
+                    }
+
+                    // Fallback: If no domain-specific mentor available, assign to ANY mentor with lowest load
+                    if (!selectedMentor && eligibleMentors.length === 0) {
+                        // Sort ALL mentors by load and find one with capacity
+                        const allMentorsSorted = [...allMentors].sort((a, b) => {
+                            const loadA = mentorLoadTracker[a.id] || 0;
+                            const loadB = mentorLoadTracker[b.id] || 0;
+                            if (loadA !== loadB) return loadA - loadB;
+                            return (b.maxLoad - loadB) - (a.maxLoad - loadA);
+                        });
+
+                        for (const mentor of allMentorsSorted) {
+                            const currentLoad = mentorLoadTracker[mentor.id] || 0;
+                            if (currentLoad < mentor.maxLoad && !assignedMentors.includes(mentor.id)) {
+                                selectedMentor = mentor;
+                                console.log(`⚠️ Fallback: Assigning team ${team.teamName} to ${mentor.name} (least loaded mentor)`);
+                                break;
+                            }
                         }
                     }
 
@@ -460,6 +488,130 @@ router.post('/assignments/:assignmentId/reviewed', authenticate, isMentor, async
     } catch (error) {
         console.error('Mark reviewed error:', error);
         res.status(500).json({ error: 'Failed to update assignment status' });
+    }
+});
+
+// Get distribution statistics/accuracy (organizer only)
+router.get('/distribution-stats/:hackathonId', authenticate, isOrganizer, async (req, res) => {
+    try {
+        const { hackathonId } = req.params;
+
+        // Get hackathon to verify organizer
+        const hackathon = await getHackathon(hackathonId);
+        if (!hackathon) {
+            return res.status(404).json({ error: 'Hackathon not found' });
+        }
+
+        if (hackathon.organizerId !== req.user.uid) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Get all assignments for this hackathon
+        const assignments = await getAssignmentsByHackathon(hackathonId);
+
+        // Get all mentors
+        const mentors = await getAllMentors();
+
+        // Get all teams with idea submissions
+        const teams = await getTeamsByHackathon(hackathonId);
+        const teamsWithIdeas = teams.filter(t => t.submissions?.idea?.description);
+
+        // Calculate per-mentor statistics
+        const mentorStats = {};
+        for (const mentor of mentors) {
+            const mentorAssignments = assignments.filter(a => a.mentorId === mentor.id);
+            mentorStats[mentor.id] = {
+                name: mentor.name,
+                email: mentor.email,
+                domains: mentor.domains,
+                maxLoad: mentor.maxLoad,
+                assignedCount: mentorAssignments.length,
+                utilization: mentor.maxLoad > 0 ? ((mentorAssignments.length / mentor.maxLoad) * 100).toFixed(1) : 0,
+                assignments: mentorAssignments.map(a => ({
+                    teamId: a.teamId,
+                    teamName: a.teamName,
+                    matchedDomain: a.matchedDomain,
+                    status: a.status
+                }))
+            };
+        }
+
+        // Calculate overall statistics
+        const assignmentCounts = Object.values(mentorStats).map(m => m.assignedCount);
+        const totalAssignments = assignmentCounts.reduce((sum, c) => sum + c, 0);
+        const mentorsWithAssignments = assignmentCounts.filter(c => c > 0).length;
+
+        // Calculate uniformity metrics
+        const avgAssignments = mentorsWithAssignments > 0 ? totalAssignments / mentorsWithAssignments : 0;
+        const maxAssignments = Math.max(...assignmentCounts, 0);
+        const minAssignments = Math.min(...assignmentCounts.filter(c => c > 0), 0);
+
+        // Standard deviation for uniformity
+        const variance = mentorsWithAssignments > 0
+            ? assignmentCounts.filter(c => c > 0).reduce((sum, c) => sum + Math.pow(c - avgAssignments, 2), 0) / mentorsWithAssignments
+            : 0;
+        const stdDev = Math.sqrt(variance);
+
+        // Uniformity score (100 = perfectly uniform, 0 = very uneven)
+        // Using coefficient of variation inverted
+        const coefficientOfVariation = avgAssignments > 0 ? (stdDev / avgAssignments) : 0;
+        const uniformityScore = Math.max(0, Math.min(100, (1 - coefficientOfVariation) * 100)).toFixed(1);
+
+        // Check for unassigned teams
+        const assignedTeamIds = new Set(assignments.map(a => a.teamId));
+        const unassignedTeams = teamsWithIdeas.filter(t => !assignedTeamIds.has(t.id));
+
+        // Calculate domain coverage
+        const domainAssignments = {};
+        for (const assignment of assignments) {
+            const domain = assignment.matchedDomain || 'unknown';
+            domainAssignments[domain] = (domainAssignments[domain] || 0) + 1;
+        }
+
+        const stats = {
+            overview: {
+                totalTeams: teams.length,
+                teamsWithIdeas: teamsWithIdeas.length,
+                totalAssignments,
+                totalMentors: mentors.length,
+                mentorsWithAssignments,
+                unassignedTeamsCount: unassignedTeams.length
+            },
+            uniformity: {
+                score: parseFloat(uniformityScore),
+                rating: parseFloat(uniformityScore) >= 80 ? 'Excellent' :
+                    parseFloat(uniformityScore) >= 60 ? 'Good' :
+                        parseFloat(uniformityScore) >= 40 ? 'Fair' : 'Poor',
+                avgAssignmentsPerMentor: avgAssignments.toFixed(2),
+                maxAssignments,
+                minAssignments: minAssignments === Infinity ? 0 : minAssignments,
+                standardDeviation: stdDev.toFixed(2),
+                description: `Distribution is ${parseFloat(uniformityScore) >= 80 ? 'highly uniform' :
+                    parseFloat(uniformityScore) >= 60 ? 'reasonably uniform' :
+                        parseFloat(uniformityScore) >= 40 ? 'somewhat uneven' : 'very uneven'}`
+            },
+            domainDistribution: domainAssignments,
+            mentorBreakdown: Object.values(mentorStats).map(m => ({
+                name: m.name,
+                email: m.email,
+                domains: m.domains,
+                assigned: m.assignedCount,
+                maxLoad: m.maxLoad,
+                utilization: `${m.utilization}%`,
+                status: m.assignedCount >= m.maxLoad ? 'At Capacity' :
+                    m.assignedCount > 0 ? 'Active' : 'No Assignments'
+            })),
+            unassignedTeams: unassignedTeams.map(t => ({
+                id: t.id,
+                name: t.teamName,
+                code: t.teamCode
+            }))
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error('Distribution stats error:', error);
+        res.status(500).json({ error: 'Failed to fetch distribution statistics' });
     }
 });
 

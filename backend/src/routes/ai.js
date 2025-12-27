@@ -6,15 +6,18 @@ import {
     getTeamsByHackathon,
     getTeam,
     saveEvaluation,
-    getEvaluationsByTeam
+    getEvaluationsByTeam,
+    updateTeam
 } from '../services/firestore.js';
-import { preEvaluateTeam, finalEvaluateTeam } from '../services/axicov.js';
+import { preEvaluateTeam, finalEvaluateTeam } from '../services/aiEvaluationService.js';
 
 const router = express.Router();
 
 // Trigger pre-evaluation for all teams in hackathon (organizer only)
 router.post('/pre-evaluate/:hackathonId', authenticate, isOrganizer, async (req, res) => {
     try {
+        console.log('🚀 Pre-evaluation triggered for hackathon:', req.params.hackathonId);
+
         const hackathon = await getHackathon(req.params.hackathonId);
 
         if (!hackathon) {
@@ -25,56 +28,73 @@ router.post('/pre-evaluate/:hackathonId', authenticate, isOrganizer, async (req,
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // Get all teams for this hackathon with status 'pending'
+        // Get all teams for this hackathon (evaluate all, not just pending)
         const allTeams = await getTeamsByHackathon(req.params.hackathonId);
-        const pendingTeams = allTeams.filter(team => team.status === 'pending');
+        console.log(`📋 Found ${allTeams.length} total teams`);
 
-        if (pendingTeams.length === 0) {
-            return res.status(400).json({ error: 'No pending teams to evaluate' });
+        if (allTeams.length === 0) {
+            return res.status(400).json({ error: 'No teams to evaluate' });
         }
 
-        const weights = hackathon.aiWeights || {
-            innovation: 40,
-            complexity: 30,
-            design: 20,
-            pitch: 10
+        // Map weights to new format (github, resume, idea, bios)
+        const hackathonWeights = hackathon.aiWeights || {};
+        const weights = {
+            github: hackathonWeights.github || hackathonWeights.complexity || 30,
+            resume: hackathonWeights.resume || hackathonWeights.design || 20,
+            idea: hackathonWeights.idea || hackathonWeights.innovation || 40,
+            bios: hackathonWeights.bios || hackathonWeights.pitch || 10
         };
+        console.log('⚖️ Using weights:', weights);
 
         // Evaluate each team
         const evaluationResults = [];
 
-        for (const team of pendingTeams) {
+        for (const team of allTeams) {
             try {
+                console.log(`\n🔄 Evaluating team: ${team.teamName} (${team.id})`);
                 const aiResult = await preEvaluateTeam(team, weights);
+                console.log(`✅ Got scores for ${team.teamName}:`, aiResult.scores);
 
-                // Save evaluation
+                // Save evaluation with reasoning
                 await saveEvaluation({
                     teamId: team.id,
                     hackathonId: req.params.hackathonId,
                     type: 'pre',
                     aiScores: aiResult.scores,
                     totalScore: aiResult.scores.total,
-                    breakdown: aiResult.breakdown
+                    breakdown: aiResult.breakdown,
+                    reasoning: aiResult.reasoning
                 });
+
+                // Update team with scores
+                await updateTeam(team.id, {
+                    scores: aiResult.scores,
+                    reasoning: aiResult.reasoning,
+                    evaluatedAt: new Date().toISOString()
+                });
+                console.log(`💾 Saved scores for team: ${team.teamName}`);
 
                 evaluationResults.push({
                     teamId: team.id,
                     teamName: team.teamName,
                     score: aiResult.scores.total,
-                    breakdown: aiResult.scores
+                    scores: aiResult.scores,
+                    reasoning: aiResult.reasoning
                 });
             } catch (error) {
-                console.error(`Error evaluating team ${team.id}:`, error);
+                console.error(`❌ Error evaluating team ${team.id}:`, error.message);
                 evaluationResults.push({
                     teamId: team.id,
                     teamName: team.teamName,
-                    error: 'Evaluation failed'
+                    error: 'Evaluation failed: ' + error.message
                 });
             }
         }
 
         // Sort by score
         evaluationResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+        console.log(`\n🎉 Evaluation complete! Evaluated ${evaluationResults.length} teams`);
 
         res.json({
             message: 'Pre-evaluation completed',
@@ -110,7 +130,14 @@ router.post('/final-evaluate/:hackathonId', authenticate, isOrganizer, async (re
             return res.status(400).json({ error: 'No teams with final submissions to evaluate' });
         }
 
-        const weights = hackathon.aiWeights;
+        // Map weights to new format
+        const hackathonWeights = hackathon.aiWeights || {};
+        const weights = {
+            github: hackathonWeights.github || hackathonWeights.complexity || 30,
+            resume: hackathonWeights.resume || hackathonWeights.design || 20,
+            idea: hackathonWeights.idea || hackathonWeights.innovation || 40,
+            bios: hackathonWeights.bios || hackathonWeights.pitch || 10
+        };
 
         // Evaluate each team
         const evaluationResults = [];
@@ -119,21 +146,30 @@ router.post('/final-evaluate/:hackathonId', authenticate, isOrganizer, async (re
             try {
                 const aiResult = await finalEvaluateTeam(team, weights);
 
-                // Save evaluation
+                // Save evaluation with reasoning
                 await saveEvaluation({
                     teamId: team.id,
                     hackathonId: req.params.hackathonId,
                     type: 'final',
                     aiScores: aiResult.scores,
                     totalScore: aiResult.scores.total,
-                    breakdown: aiResult.breakdown
+                    breakdown: aiResult.breakdown,
+                    reasoning: aiResult.reasoning
+                });
+
+                // Update team with final scores
+                await updateTeam(team.id, {
+                    finalScores: aiResult.scores,
+                    finalReasoning: aiResult.reasoning,
+                    finalEvaluatedAt: new Date().toISOString()
                 });
 
                 evaluationResults.push({
                     teamId: team.id,
                     teamName: team.teamName,
                     score: aiResult.scores.total,
-                    breakdown: aiResult.scores
+                    scores: aiResult.scores,
+                    reasoning: aiResult.reasoning
                 });
             } catch (error) {
                 console.error(`Error evaluating team ${team.id}:`, error);

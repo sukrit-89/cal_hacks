@@ -152,12 +152,29 @@ router.put('/:id', authenticate, async (req, res) => {
             return res.status(404).json({ error: 'Team not found' });
         }
 
-        // Only team leader can update
-        if (team.leaderId !== req.user.uid) {
-            return res.status(403).json({ error: 'Only team leader can update team details' });
+        // Check if user is team leader OR organizer of the hackathon
+        const hackathon = await getHackathon(team.hackathonId);
+        const isTeamLeader = team.leaderId === req.user.uid;
+        const isOrganizer = hackathon && hackathon.organizerId === req.user.uid;
+
+        if (!isTeamLeader && !isOrganizer) {
+            return res.status(403).json({ error: 'Not authorized to update team' });
         }
 
-        await updateTeam(req.params.id, req.body);
+        // If organizer is updating status, allow only status changes
+        if (isOrganizer && !isTeamLeader) {
+            const allowedFields = ['status'];
+            const updates = {};
+            for (const field of allowedFields) {
+                if (req.body[field] !== undefined) {
+                    updates[field] = req.body[field];
+                }
+            }
+            await updateTeam(req.params.id, updates);
+        } else {
+            // Team leader can update all fields
+            await updateTeam(req.params.id, req.body);
+        }
 
         res.json({ message: 'Team updated successfully' });
     } catch (error) {

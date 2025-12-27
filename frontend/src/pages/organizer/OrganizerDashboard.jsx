@@ -18,11 +18,18 @@ export const OrganizerDashboard = () => {
     const { hackathons, fetchHackathons } = useHackathonStore();
     const [selectedHackathon, setSelectedHackathon] = useState(null);
     const [aiWeights, setAiWeights] = useState({
-        innovation: 40,
-        complexity: 30,
-        design: 20,
-        pitch: 10
+        idea: 40,
+        github: 30,
+        resume: 20,
+        bios: 10
     });
+
+    const weightLabels = {
+        idea: 'Idea Quality',
+        github: 'GitHub Profile',
+        resume: 'Resume/Skills',
+        bios: 'Team Bios'
+    };
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTeam, setSelectedTeam] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -380,12 +387,12 @@ export const OrganizerDashboard = () => {
                                     <div key={key}>
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center">
-                                                <div className={`w-3 h-3 rounded-full mr-2 ${key === 'innovation' ? 'bg-accent-purple' :
-                                                    key === 'complexity' ? 'bg-primary' :
-                                                        key === 'design' ? 'bg-accent-pink' :
+                                                <div className={`w-3 h-3 rounded-full mr-2 ${key === 'idea' ? 'bg-accent-pink' :
+                                                    key === 'github' ? 'bg-accent-purple' :
+                                                        key === 'resume' ? 'bg-primary' :
                                                             'bg-accent-yellow'
                                                     }`} />
-                                                <span className="text-sm font-medium capitalize">{key}</span>
+                                                <span className="text-sm font-medium">{weightLabels[key] || key}</span>
                                             </div>
                                             <span className="text-sm font-bold">{value}%</span>
                                         </div>
@@ -400,9 +407,9 @@ export const OrganizerDashboard = () => {
                                             }}
                                             className="w-full"
                                             style={{
-                                                accentColor: key === 'innovation' ? '#8B5CF6' :
-                                                    key === 'complexity' ? '#3B82F6' :
-                                                        key === 'design' ? '#EC4899' :
+                                                accentColor: key === 'idea' ? '#EC4899' :
+                                                    key === 'github' ? '#8B5CF6' :
+                                                        key === 'resume' ? '#3B82F6' :
                                                             '#F59E0B'
                                             }}
                                         />

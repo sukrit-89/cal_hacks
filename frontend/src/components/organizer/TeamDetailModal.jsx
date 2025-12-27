@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Github, FileText, Users, ExternalLink } from 'lucide-react';
+import { X, Github, FileText, Users, ExternalLink, Brain, Lightbulb, Code, FileCheck, MessageSquare } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -45,63 +45,115 @@ export const TeamDetailModal = ({ isOpen, onClose, team, onStatusUpdate }) => {
                 {team.scores && (
                     <div className="p-6 bg-dark-bg rounded-xl">
                         <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold">HackHealth Score</h4>
+                            <h4 className="font-bold flex items-center">
+                                <Brain className="w-5 h-5 mr-2 text-primary" />
+                                HackHealth Score
+                            </h4>
                             <div className="text-3xl font-bold text-primary">
                                 {team.scores.total || 0}
                                 <span className="text-sm text-gray-400">/100</span>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
-                                <div className="text-sm text-gray-400 mb-1">Innovation</div>
+                                <div className="text-sm text-gray-400 mb-1 flex items-center">
+                                    <Code className="w-3 h-3 mr-1" />
+                                    GitHub ({team.scores.github || team.scores.complexity || 0})
+                                </div>
                                 <div className="flex items-center">
                                     <div className="flex-1 h-2 bg-dark-card rounded-full mr-3">
                                         <div
                                             className="h-full bg-accent-purple rounded-full"
-                                            style={{ width: `${team.scores.innovation || 0}%` }}
+                                            style={{ width: `${team.scores.github || team.scores.complexity || 0}%` }}
                                         />
                                     </div>
-                                    <span className="font-medium">{team.scores.innovation || 0}</span>
                                 </div>
                             </div>
                             <div>
-                                <div className="text-sm text-gray-400 mb-1">Complexity</div>
+                                <div className="text-sm text-gray-400 mb-1 flex items-center">
+                                    <FileCheck className="w-3 h-3 mr-1" />
+                                    Resume ({team.scores.resume || team.scores.design || 0})
+                                </div>
                                 <div className="flex items-center">
                                     <div className="flex-1 h-2 bg-dark-card rounded-full mr-3">
                                         <div
                                             className="h-full bg-primary rounded-full"
-                                            style={{ width: `${team.scores.complexity || 0}%` }}
+                                            style={{ width: `${team.scores.resume || team.scores.design || 0}%` }}
                                         />
                                     </div>
-                                    <span className="font-medium">{team.scores.complexity || 0}</span>
                                 </div>
                             </div>
                             <div>
-                                <div className="text-sm text-gray-400 mb-1">Design</div>
+                                <div className="text-sm text-gray-400 mb-1 flex items-center">
+                                    <Lightbulb className="w-3 h-3 mr-1" />
+                                    Idea ({team.scores.idea || team.scores.innovation || 0})
+                                </div>
                                 <div className="flex items-center">
                                     <div className="flex-1 h-2 bg-dark-card rounded-full mr-3">
                                         <div
                                             className="h-full bg-accent-pink rounded-full"
-                                            style={{ width: `${team.scores.design || 0}%` }}
+                                            style={{ width: `${team.scores.idea || team.scores.innovation || 0}%` }}
                                         />
                                     </div>
-                                    <span className="font-medium">{team.scores.design || 0}</span>
                                 </div>
                             </div>
                             <div>
-                                <div className="text-sm text-gray-400 mb-1">Pitch</div>
+                                <div className="text-sm text-gray-400 mb-1 flex items-center">
+                                    <MessageSquare className="w-3 h-3 mr-1" />
+                                    Team Bios ({team.scores.bios || team.scores.pitch || 0})
+                                </div>
                                 <div className="flex items-center">
                                     <div className="flex-1 h-2 bg-dark-card rounded-full mr-3">
                                         <div
                                             className="h-full bg-accent-yellow rounded-full"
-                                            style={{ width: `${team.scores.pitch || 0}%` }}
+                                            style={{ width: `${team.scores.bios || team.scores.pitch || 0}%` }}
                                         />
                                     </div>
-                                    <span className="font-medium">{team.scores.pitch || 0}</span>
                                 </div>
                             </div>
                         </div>
+
+                        {/* AI Reasoning */}
+                        {team.reasoning && (
+                            <div className="mt-4 pt-4 border-t border-dark-border">
+                                <h5 className="text-sm font-semibold mb-3 text-gray-300">AI Reasoning</h5>
+                                <div className="space-y-3 text-sm">
+                                    {team.reasoning.github && (
+                                        <div className="p-3 bg-dark-card rounded-lg">
+                                            <div className="font-medium text-accent-purple mb-1 flex items-center">
+                                                <Code className="w-3 h-3 mr-1" /> GitHub Analysis
+                                            </div>
+                                            <p className="text-gray-400">{team.reasoning.github}</p>
+                                        </div>
+                                    )}
+                                    {team.reasoning.resume && (
+                                        <div className="p-3 bg-dark-card rounded-lg">
+                                            <div className="font-medium text-primary mb-1 flex items-center">
+                                                <FileCheck className="w-3 h-3 mr-1" /> Resume Evaluation
+                                            </div>
+                                            <p className="text-gray-400">{team.reasoning.resume}</p>
+                                        </div>
+                                    )}
+                                    {team.reasoning.idea && (
+                                        <div className="p-3 bg-dark-card rounded-lg">
+                                            <div className="font-medium text-accent-pink mb-1 flex items-center">
+                                                <Lightbulb className="w-3 h-3 mr-1" /> Idea Assessment
+                                            </div>
+                                            <p className="text-gray-400">{team.reasoning.idea}</p>
+                                        </div>
+                                    )}
+                                    {team.reasoning.bios && (
+                                        <div className="p-3 bg-dark-card rounded-lg">
+                                            <div className="font-medium text-accent-yellow mb-1 flex items-center">
+                                                <MessageSquare className="w-3 h-3 mr-1" /> Team Bios Review
+                                            </div>
+                                            <p className="text-gray-400">{team.reasoning.bios}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

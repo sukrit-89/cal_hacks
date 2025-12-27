@@ -27,12 +27,26 @@ export const CreateHackathon = () => {
             hackathonEnd: ''
         },
         aiWeights: {
-            innovation: 40,
-            complexity: 30,
-            design: 20,
-            pitch: 10
+            idea: 40,
+            github: 30,
+            resume: 20,
+            bios: 10
         }
     });
+
+    const weightLabels = {
+        idea: 'Idea Quality',
+        github: 'GitHub Profile',
+        resume: 'Resume/Skills',
+        bios: 'Team Bios'
+    };
+
+    const weightDescriptions = {
+        idea: 'Evaluates innovation, feasibility, and market potential of the project idea',
+        github: 'Analyzes GitHub contributions, code quality, and technical expertise',
+        resume: 'Assesses team members\' skills, experience, and background',
+        bios: 'Reviews team composition, roles, and collaboration potential'
+    };
 
     const [error, setError] = useState('');
 
@@ -251,16 +265,17 @@ export const CreateHackathon = () => {
                         <Card className="p-6">
                             <h2 className="text-xl font-bold mb-6">AI Evaluation Weights</h2>
                             <p className="text-gray-400 text-sm mb-6">
-                                Configure how the AI will evaluate submissions. Weights must total 100%.
+                                Configure how the AI will evaluate team submissions. Weights must total 100%.
                             </p>
 
                             <div className="space-y-6">
                                 {Object.entries(formData.aiWeights).map(([key, value]) => (
                                     <div key={key}>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-sm font-medium capitalize">{key}</label>
-                                            <span className="text-sm font-bold">{value}%</span>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-sm font-medium">{weightLabels[key] || key}</label>
+                                            <span className="text-sm font-bold text-primary">{value}%</span>
                                         </div>
+                                        <p className="text-xs text-gray-500 mb-2">{weightDescriptions[key]}</p>
                                         <input
                                             type="range"
                                             min="0"
