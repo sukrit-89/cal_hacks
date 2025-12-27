@@ -14,6 +14,7 @@ export const TeamCreation = () => {
     const [teamName, setTeamName] = useState('');
     const [teamCode, setTeamCode] = useState('');
     const [memberBio, setMemberBio] = useState('');
+    const [memberGithub, setMemberGithub] = useState('');
     const [memberLinkedIn, setMemberLinkedIn] = useState('');
     const [error, setError] = useState('');
 
@@ -51,6 +52,7 @@ export const TeamCreation = () => {
         try {
             const team = await joinTeam(teamCode.toUpperCase(), {
                 bio: memberBio,
+                githubUrl: memberGithub,
                 linkedinUrl: memberLinkedIn
             });
             navigate(`/teams/${team.id}`);
@@ -180,6 +182,15 @@ export const TeamCreation = () => {
                                             {memberBio.length} characters
                                         </p>
                                     </div>
+
+                                    <Input
+                                        label="GitHub Profile"
+                                        type="url"
+                                        value={memberGithub}
+                                        onChange={(e) => setMemberGithub(e.target.value)}
+                                        placeholder="https://github.com/username"
+                                        required
+                                    />
 
                                     <Input
                                         label="LinkedIn Profile (Optional)"

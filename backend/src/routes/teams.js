@@ -63,7 +63,7 @@ router.post('/', authenticate, isParticipant, async (req, res) => {
 // Join team with code (participant only)
 router.post('/join', authenticate, isParticipant, async (req, res) => {
     try {
-        const { teamCode, bio, linkedinUrl } = req.body;
+        const { teamCode, bio, githubUrl, linkedinUrl } = req.body;
 
         const team = await getTeam(teamCode);
 
@@ -82,10 +82,11 @@ router.post('/join', authenticate, isParticipant, async (req, res) => {
         // Initialize teamBios array if it doesn't exist
         const teamBios = team.teamBios || [];
 
-        // Add member's bio and LinkedIn
+        // Add member's profile (bio, GitHub, LinkedIn)
         teamBios.push({
             userId: req.user.uid,
             bio: bio || '',
+            githubUrl: githubUrl || '',
             linkedinUrl: linkedinUrl || ''
         });
 
