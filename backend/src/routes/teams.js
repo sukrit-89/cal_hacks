@@ -10,8 +10,13 @@ import {
     getTeamsByHackathon,
     getTeamsByUser,
     updateTeam,
-    getHackathon
+    getHackathon,
+    createTeamInvite,
+    getTeamInvites,
+    updateInviteStatus,
+    getUser
 } from '../services/firestore.js';
+import { createTeamInviteNotification } from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -251,6 +256,103 @@ router.post('/:id/final-submit', authenticate, isParticipant, async (req, res) =
     } catch (error) {
         console.error('Final submission error:', error);
         res.status(500).json({ error: 'Failed to submit final project' });
+    }
+});
+
+// Send team invite (team leader only)
+router.post('/:id/invite', authenticate, isParticipant, async (req, res) => {
+    try {
+        const team = await getTeam(req.params.id);
+
+        if (!team) {
+            return res.status(404).json({ error: 'Team not found' });
+        }
+
+        if (team.leaderId !== req.user.uid) {
+            return res.status(403).json({ error: 'Only team leader can send invites' });
+        }
+
+        const { invitedUserId } = req.body;
+
+        // Get invited user info
+        const invitedUser = await getUser(invitedUserId);
+        if (!invitedUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Create invite
+        const inviteId = await createTeamInvite({
+            teamId: req.params.id,
+            teamName: team.teamName,
+            hackathonId: team.hackathonId,
+            invitedBy: req.user.uid,
+            invitedUser: invitedUserId
+        });
+
+        // Create notification
+        const currentUser = await getUser(req.user.uid);
+        await createTeamInviteNotification(
+            invitedUserId,
+            team.teamName,
+            req.params.id,
+            currentUser.displayName || 'Someone'
+        );
+
+        res.json({ message: 'Invite sent successfully', inviteId });
+    } catch (error) {
+        console.error('Send invite error:', error);
+        res.status(500).json({ error: 'Failed to send invite' });
+    }
+});
+
+// Get user's team invites
+router.get('/invites/me', authenticate, async (req, res) => {
+    try {
+        const invites = await getTeamInvites(req.user.uid);
+        res.json({ invites });
+    } catch (error) {
+        console.error('Get invites error:', error);
+        res.status(500).json({ error: 'Failed to fetch invites' });
+    }
+});
+
+// Accept team invite
+router.post('/invites/:id/accept', authenticate, isParticipant, async (req, res) => {
+    try {
+        const invites = await getTeamInvites(req.user.uid);
+        const invite = invites.find(inv => inv.id === req.params.id);
+
+        if (!invite) {
+            return res.status(404).json({ error: 'Invite not found' });
+        }
+
+        // Add user to team
+        const team = await getTeam(invite.teamId);
+        if (!team) {
+            return res.status(404).json({ error: 'Team not found' });
+        }
+
+        const updatedMembers = [...team.members, req.user.uid];
+        await updateTeam(invite.teamId, { members: updatedMembers });
+
+        // Update invite status
+        await updateInviteStatus(req.params.id, 'accepted');
+
+        res.json({ message: 'Invite accepted successfully', team });
+    } catch (error) {
+        console.error('Accept invite error:', error);
+        res.status(500).json({ error: 'Failed to accept invite' });
+    }
+});
+
+// Reject team invite
+router.post('/invites/:id/reject', authenticate, isParticipant, async (req, res) => {
+    try {
+        await updateInviteStatus(req.params.id, 'rejected');
+        res.json({ message: 'Invite rejected' });
+    } catch (error) {
+        console.error('Reject invite error:', error);
+        res.status(500).json({ error: 'Failed to reject invite' });
     }
 });
 

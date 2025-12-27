@@ -8,6 +8,9 @@ import hackathonRoutes from './routes/hackathons.js';
 import teamRoutes from './routes/teams.js';
 import uploadRoutes from './routes/uploads.js';
 import aiRoutes from './routes/ai.js';
+import notificationRoutes from './routes/notifications.js';
+import statsRoutes from './routes/stats.js';
+import deadlinesRoutes from './routes/deadlines.js';
 
 const app = express();
 
@@ -25,6 +28,9 @@ app.use('/api/hackathons', hackathonRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/deadlines', deadlinesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

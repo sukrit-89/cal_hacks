@@ -129,6 +129,130 @@ export const getEvaluationsByHackathon = async (hackathonId, type = null) => {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
+// User statistics operations
+export const getUserStats = async (userId) => {
+    // Get all user's teams
+    const userTeams = await getTeamsByUser(userId);
+
+    // Calculate stats
+    const activeHackathons = userTeams.filter(t =>
+        ['pending', 'accepted'].includes(t.status)
+    ).length;
+
+    const pendingReviews = userTeams.filter(t => t.status === 'pending').length;
+
+    const totalWins = userTeams.filter(t => t.winner === true).length;
+
+    const totalParticipations = userTeams.length;
+
+    // Calculate ranking (this is a simple implementation)
+    // In production, you'd want a more sophisticated ranking system
+    const allUsersSnapshot = await db.collection('users').get();
+    const totalUsers = allUsersSnapshot.size;
+    const rank = totalWins > 0 ? Math.ceil((totalUsers * 0.1)) : null; // Top 10% if has wins
+
+    return {
+        activeHackathons,
+        pendingReviews,
+        totalWins,
+        totalParticipations,
+        rank,
+        rankPercentile: rank ? 10 : null
+    };
+};
+
+// Team invite operations
+export const createTeamInvite = async (inviteData) => {
+    const docRef = await db.collection('team_invites').add({
+        ...inviteData,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+    });
+    return docRef.id;
+};
+
+export const getTeamInvites = async (userId) => {
+    const snapshot = await db.collection('team_invites')
+        .where('invitedUser', '==', userId)
+        .where('status', '==', 'pending')
+        .orderBy('createdAt', 'desc')
+        .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+export const updateInviteStatus = async (inviteId, status) => {
+    await db.collection('team_invites').doc(inviteId).update({
+        status,
+        respondedAt: new Date().toISOString()
+    });
+};
+
+export const getUserInviteCount = async (userId) => {
+    const snapshot = await db.collection('team_invites')
+        .where('invitedUser', '==', userId)
+        .where('status', '==', 'pending')
+        .get();
+
+    return snapshot.size;
+};
+
+// Deadline operations
+export const getUserDeadlines = async (userId) => {
+    // Get user's active teams
+    const userTeams = await getTeamsByUser(userId);
+    const activeTeams = userTeams.filter(t => ['pending', 'accepted'].includes(t.status));
+
+    const deadlines = [];
+
+    // Extract deadlines from hackathon timelines
+    for (const team of activeTeams) {
+        const hackathon = await getHackathon(team.hackathonId);
+        if (!hackathon || !hackathon.timeline) continue;
+
+        const timeline = hackathon.timeline;
+
+        // Registration deadline
+        if (timeline.registrationClose) {
+            deadlines.push({
+                id: `${hackathon.id}-registration`,
+                title: 'Registration Closes',
+                event: hackathon.title,
+                time: timeline.registrationClose,
+                hackathonId: hackathon.id
+            });
+        }
+
+        // Idea submission deadline
+        if (timeline.ideaSubmission) {
+            deadlines.push({
+                id: `${hackathon.id}-idea`,
+                title: 'Idea Submission',
+                event: hackathon.title,
+                time: timeline.ideaSubmission,
+                hackathonId: hackathon.id
+            });
+        }
+
+        // Final submission deadline
+        if (timeline.finalSubmission) {
+            deadlines.push({
+                id: `${hackathon.id}-final`,
+                title: 'Final Submission',
+                event: hackathon.title,
+                time: timeline.finalSubmission,
+                hackathonId: hackathon.id
+            });
+        }
+    }
+
+    // Filter out past deadlines and sort by date
+    const now = new Date();
+    return deadlines
+        .filter(d => new Date(d.time) > now)
+        .sort((a, b) => new Date(a.time) - new Date(b.time));
+};
+
 export default {
     createUser,
     getUser,
@@ -146,5 +270,12 @@ export default {
     updateTeam,
     saveEvaluation,
     getEvaluationsByTeam,
-    getEvaluationsByHackathon
+    getEvaluationsByHackathon,
+    getUserStats,
+    createTeamInvite,
+    getTeamInvites,
+    updateInviteStatus,
+    getUserInviteCount,
+    getUserDeadlines
 };
+

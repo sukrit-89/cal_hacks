@@ -8,52 +8,30 @@ import { Button } from '../../components/ui/Button';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { Link } from 'react-router-dom';
 import { formatDateTime } from '../../utils/helpers';
+import { useNotifications } from '../../hooks/useNotifications';
+import { useUserStats } from '../../hooks/useUserStats';
+import { useTeamInvites } from '../../hooks/useTeamInvites';
+import { useDeadlines } from '../../hooks/useDeadlines';
 
 export const ParticipantDashboard = () => {
     const { user } = useAuthStore();
     const { teams, fetchUserTeams } = useTeamStore();
 
+    // Use custom hooks for real data
+    const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+    const { stats, loading: statsLoading } = useUserStats();
+    const { invites, acceptInvite, rejectInvite, inviteCount } = useTeamInvites();
+    const { deadlines, loading: deadlinesLoading } = useDeadlines();
+
     useEffect(() => {
         fetchUserTeams();
     }, []);
 
-    // Mock notifications and stats
-    const notifications = [
-        {
-            id: 1,
-            type: 'success',
-            message: 'HackMIT accepted your application!',
-            time: '2 hours ago'
-        },
-        {
-            id: 2,
-            type: 'info',
-            message: 'Team invite from @Sarah_Design for Web3 Summit',
-            time: '5 hours ago',
-            actions: true
-        }
-    ];
-
-    const deadlines = [
-        {
-            id: 1,
-            title: 'Idea Submission',
-            event: 'AI Global Challenge',
-            time: 'Tomorrow, 11:59 PM'
-        },
-        {
-            id: 2,
-            title: 'Team Registration Closes',
-            event: 'Web3 Summit',
-            time: 'Oct 25, 05:00 PM'
-        }
-    ];
-
-    // Stats
-    const activeHackathons = teams.filter(t => ['pending', 'accepted'].includes(t.status)).length;
-    const pendingReviews = teams.filter(t => t.status === 'pending').length;
-    const totalWins = 5; // Mock
-    const teamInvites = 2; // Mock
+    // Stats from API
+    const activeHackathons = stats?.activeHackathons || 0;
+    const pendingReviews = stats?.pendingReviews || 0;
+    const totalWins = stats?.totalWins || 0;
+    const teamInvites = inviteCount;
 
     return (
         <div className="flex min-h-screen">
@@ -92,7 +70,9 @@ export const ParticipantDashboard = () => {
                             <Target className="w-5 h-5 text-accent-green" />
                         </div>
                         <div className="text-3xl font-bold">{totalWins}</div>
-                        <div className="text-sm text-accent-green mt-1">Top 10% Rank</div>
+                        <div className="text-sm text-accent-green mt-1">
+                            {stats?.rankPercentile ? `Top ${stats.rankPercentile}% Rank` : 'Keep going!'}
+                        </div>
                     </Card>
 
                     <Card className="p-6">
@@ -184,30 +164,82 @@ export const ParticipantDashboard = () => {
                                 <h3 className="font-bold flex items-center">
                                     <Bell className="w-5 h-5 mr-2 text-primary" />
                                     Notifications
+                                    {unreadCount > 0 && (
+                                        <span className="ml-2 bg-primary text-xs px-2 py-0.5 rounded-full">
+                                            {unreadCount}
+                                        </span>
+                                    )}
                                 </h3>
-                                <button className="text-sm text-primary hover:underline">Mark all read</button>
+                                <button
+                                    className="text-sm text-primary hover:underline"
+                                    onClick={markAllAsRead}
+                                >
+                                    Mark all read
+                                </button>
                             </div>
                             <div className="space-y-3">
-                                {notifications.map((notification) => (
-                                    <div key={notification.id} className="p-3 bg-dark-bg rounded-lg">
-                                        <div className="flex items-start space-x-2">
-                                            <div
-                                                className={`w-2 h-2 rounded-full mt-1.5 ${notification.type === 'success' ? 'bg-accent-green' : 'bg-primary'
-                                                    }`}
-                                            />
-                                            <div className="flex-1">
-                                                <p className="text-sm">{notification.message}</p>
-                                                <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                                                {notification.actions && (
-                                                    <div className="flex gap-2 mt-2">
-                                                        <button className="text-xs btn-primary py-1 px-3">Accept</button>
-                                                        <button className="text-xs btn-secondary py-1 px-3">Decline</button>
-                                                    </div>
-                                                )}
+                                {notifications.length === 0 ? (
+                                    <p className="text-gray-400 text-sm text-center py-4">
+                                        No notifications yet
+                                    </p>
+                                ) : (
+                                    notifications.map((notification) => (
+                                        <div
+                                            key={notification.id}
+                                            className={`p-3 rounded-lg cursor-pointer ${notification.read ? 'bg-dark-bg' : 'bg-dark-bg border border-primary/30'
+                                                }`}
+                                            onClick={() => !notification.read && markAsRead(notification.id)}
+                                        >
+                                            <div className="flex items-start space-x-2">
+                                                <div
+                                                    className={`w-2 h-2 rounded-full mt-1.5 ${notification.type === 'application_status' ? 'bg-accent-green' : 'bg-primary'
+                                                        }`}
+                                                />
+                                                <div className="flex-1">
+                                                    <p className="text-sm">{notification.message}</p>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {new Date(notification.createdAt).toLocaleString()}
+                                                    </p>
+                                                    {notification.type === 'team_invite' && notification.data?.teamId && (
+                                                        <div className="flex gap-2 mt-2">
+                                                            <button
+                                                                className="text-xs btn-primary py-1 px-3"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    // Find the matching invite
+                                                                    const invite = invites.find(inv =>
+                                                                        inv.teamId === notification.data.teamId
+                                                                    );
+                                                                    if (invite) {
+                                                                        await acceptInvite(invite.id);
+                                                                        markAsRead(notification.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Accept
+                                                            </button>
+                                                            <button
+                                                                className="text-xs btn-secondary py-1 px-3"
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    const invite = invites.find(inv =>
+                                                                        inv.teamId === notification.data.teamId
+                                                                    );
+                                                                    if (invite) {
+                                                                        await rejectInvite(invite.id);
+                                                                        markAsRead(notification.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Decline
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                         </Card>
 
@@ -218,19 +250,33 @@ export const ParticipantDashboard = () => {
                                 Deadlines
                             </h3>
                             <div className="space-y-3">
-                                {deadlines.map((deadline) => (
-                                    <div key={deadline.id} className="p-3 bg-dark-bg rounded-lg">
-                                        <div className="flex items-start justify-between mb-1">
-                                            <p className="font-medium text-sm">{deadline.title}</p>
-                                            <div className="w-2 h-2 bg-accent-red rounded-full mt-1.5" />
+                                {deadlinesLoading ? (
+                                    <p className="text-gray-400 text-sm text-center py-4">
+                                        Loading deadlines...
+                                    </p>
+                                ) : deadlines.length === 0 ? (
+                                    <p className="text-gray-400 text-sm text-center py-4">
+                                        No upcoming deadlines
+                                    </p>
+                                ) : (
+                                    deadlines.slice(0, 5).map((deadline) => (
+                                        <div key={deadline.id} className="p-3 bg-dark-bg rounded-lg">
+                                            <div className="flex items-start justify-between mb-1">
+                                                <p className="font-medium text-sm">{deadline.title}</p>
+                                                <div className="w-2 h-2 bg-accent-red rounded-full mt-1.5" />
+                                            </div>
+                                            <p className="text-xs text-gray-400">{deadline.event}</p>
+                                            <p className="text-xs text-accent-red mt-1">
+                                                {new Date(deadline.time).toLocaleString()}
+                                            </p>
                                         </div>
-                                        <p className="text-xs text-gray-400">{deadline.event}</p>
-                                        <p className="text-xs text-accent-red mt-1">{deadline.time}</p>
-                                    </div>
-                                ))}
-                                <button className="w-full text-sm text-primary hover:underline mt-2">
-                                    View Full Calendar
-                                </button>
+                                    ))
+                                )}
+                                {deadlines.length > 5 && (
+                                    <button className="w-full text-sm text-primary hover:underline mt-2">
+                                        View Full Calendar
+                                    </button>
+                                )}
                             </div>
                         </Card>
                     </div>
