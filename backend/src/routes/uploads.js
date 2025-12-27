@@ -45,6 +45,15 @@ router.post('/resume', authenticate, upload.single('resume'), async (req, res) =
         });
     } catch (error) {
         console.error('Resume upload error:', error);
+
+        // Check if it's a Firebase Storage billing error
+        if (error.message?.includes('billing') || error.message?.includes('accountDisabled')) {
+            return res.status(503).json({
+                error: 'File upload temporarily unavailable. Firebase Storage billing is not enabled. Please enable billing in Firebase Console or contact administrator.',
+                fallback: 'You can continue without uploading files for now.'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to upload resume' });
     }
 });
@@ -64,6 +73,15 @@ router.post('/ppt', authenticate, upload.single('ppt'), async (req, res) => {
         });
     } catch (error) {
         console.error('PPT upload error:', error);
+
+        // Check if it's a Firebase Storage billing error
+        if (error.message?.includes('billing') || error.message?.includes('accountDisabled')) {
+            return res.status(503).json({
+                error: 'File upload temporarily unavailable. Firebase Storage billing is not enabled. Please enable billing in Firebase Console or contact administrator.',
+                fallback: 'You can continue without uploading files for now.'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to upload presentation' });
     }
 });
@@ -83,6 +101,15 @@ router.post('/executable', authenticate, upload.single('executable'), async (req
         });
     } catch (error) {
         console.error('Executable upload error:', error);
+
+        // Check if it's a Firebase Storage billing error
+        if (error.message?.includes('billing') || error.message?.includes('accountDisabled')) {
+            return res.status(503).json({
+                error: 'File upload temporarily unavailable. Firebase Storage billing is not enabled. Please enable billing in Firebase Console or contact administrator.',
+                fallback: 'You can continue without uploading files for now.'
+            });
+        }
+
         res.status(500).json({ error: 'Failed to upload file' });
     }
 });
