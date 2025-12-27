@@ -71,8 +71,19 @@ export const OrganizerDashboard = () => {
         try {
             await api.put(`/teams/${teamId}`, { status });
             fetchTeamsByHackathon(selectedHackathon.id);
+            alert(`Team ${status === 'accepted' ? 'approved' : status === 'rejected' ? 'rejected' : 'updated'}!`);
         } catch (error) {
             alert('Failed to update team status');
+        }
+    };
+
+    const handleChangeHackathonStatus = async (newStatus) => {
+        try {
+            await api.put(`/hackathons/${selectedHackathon.id}`, { status: newStatus });
+            fetchHackathons({ organizerId: user.id });
+            alert(`Hackathon status changed to ${newStatus}!`);
+        } catch (error) {
+            alert('Failed to change hackathon status');
         }
     };
 
@@ -114,6 +125,24 @@ export const OrganizerDashboard = () => {
                             )}
                         </div>
                     </div>
+
+                    {/* Status Control */}
+                    {selectedHackathon && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-400">Status:</span>
+                            <Badge status={selectedHackathon.status}>{selectedHackathon.status}</Badge>
+                            <select
+                                value={selectedHackathon.status}
+                                onChange={(e) => handleChangeHackathonStatus(e.target.value)}
+                                className="input-field py-1 px-2 text-sm"
+                            >
+                                <option value="draft">Draft</option>
+                                <option value="upcoming">Upcoming</option>
+                                <option value="live">Live</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid lg:grid-cols-4 gap-6 mb-8">
@@ -184,9 +213,30 @@ export const OrganizerDashboard = () => {
                                         />
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button variant="success" size="sm">Accept</Button>
-                                        <Button variant="danger" size="sm">Reject</Button>
-                                        <Button variant="secondary" size="sm">Waitlist</Button>
+                                        <Button
+                                            variant="success"
+                                            size="sm"
+                                            onClick={() => {
+                                                const selectedTeamIds = filteredTeams
+                                                    .filter((_, i) => document.querySelectorAll('input[type="checkbox"]')[i + 1]?.checked)
+                                                    .map(t => t.id);
+                                                selectedTeamIds.forEach(id => handleUpdateTeamStatus(id, 'accepted'));
+                                            }}
+                                        >
+                                            Accept Selected
+                                        </Button>
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => {
+                                                const selectedTeamIds = filteredTeams
+                                                    .filter((_, i) => document.querySelectorAll('input[type="checkbox"]')[i + 1]?.checked)
+                                                    .map(t => t.id);
+                                                selectedTeamIds.forEach(id => handleUpdateTeamStatus(id, 'rejected'));
+                                            }}
+                                        >
+                                            Reject Selected
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -270,6 +320,24 @@ export const OrganizerDashboard = () => {
                                                     </td>
                                                     <td className="py-4">
                                                         <div className="flex items-center gap-2">
+                                                            {team.status === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleUpdateTeamStatus(team.id, 'accepted')}
+                                                                        className="p-1.5 px-3 bg-accent-green/10 hover:bg-accent-green/20 text-accent-green rounded text-xs font-medium transition-colors"
+                                                                        title="Accept team"
+                                                                    >
+                                                                        Accept
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleUpdateTeamStatus(team.id, 'rejected')}
+                                                                        className="p-1.5 px-3 bg-accent-red/10 hover:bg-accent-red/20 text-accent-red rounded text-xs font-medium transition-colors"
+                                                                        title="Reject team"
+                                                                    >
+                                                                        Reject
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                             <button
                                                                 onClick={() => {
                                                                     setSelectedTeam(team);
@@ -344,8 +412,8 @@ export const OrganizerDashboard = () => {
                                     <div className="flex items-center justify-between">
                                         <span className="font-medium">Total Weight</span>
                                         <span className={`font-bold ${Object.values(aiWeights).reduce((a, b) => a + b, 0) === 100
-                                                ? 'text-accent-green'
-                                                : 'text-accent-red'
+                                            ? 'text-accent-green'
+                                            : 'text-accent-red'
                                             }`}>
                                             {Object.values(aiWeights).reduce((a, b) => a + b, 0)}%
                                         </span>

@@ -19,6 +19,7 @@ export const CreateHackathon = () => {
         banner: '',
         tags: '',
         rules: '',
+        status: 'draft', // Add status to form data
         timeline: {
             registrationStart: '',
             registrationEnd: '',
@@ -70,8 +71,8 @@ export const CreateHackathon = () => {
 
             const result = await createHackathon({
                 ...formData,
-                tags: tagsArray,
-                status: 'draft'
+                tags: tagsArray
+                // status is already in formData
             });
 
             navigate('/organizer/dashboard');
@@ -173,6 +174,26 @@ export const CreateHackathon = () => {
                                     onChange={handleChange}
                                     placeholder="AI, Machine Learning, Web3"
                                 />
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Status
+                                    </label>
+                                    <select
+                                        name="status"
+                                        value={formData.status}
+                                        onChange={handleChange}
+                                        className="input-field"
+                                    >
+                                        <option value="draft">Draft (not visible to participants)</option>
+                                        <option value="upcoming">Upcoming (visible, registration not open)</option>
+                                        <option value="live">Live (registration open)</option>
+                                        <option value="closed">Closed (registration ended)</option>
+                                    </select>
+                                    <p className="text-sm text-gray-400 mt-1">
+                                        Set to <strong className="text-primary">Live</strong> to enable participant registration
+                                    </p>
+                                </div>
                             </div>
                         </Card>
 
@@ -255,8 +276,8 @@ export const CreateHackathon = () => {
                                     <div className="flex items-center justify-between">
                                         <span className="font-medium">Total Weight</span>
                                         <span className={`font-bold text-lg ${Object.values(formData.aiWeights).reduce((a, b) => a + b, 0) === 100
-                                                ? 'text-accent-green'
-                                                : 'text-accent-red'
+                                            ? 'text-accent-green'
+                                            : 'text-accent-red'
                                             }`}>
                                             {Object.values(formData.aiWeights).reduce((a, b) => a + b, 0)}%
                                         </span>
