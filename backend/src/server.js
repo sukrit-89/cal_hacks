@@ -12,6 +12,7 @@ import notificationRoutes from './routes/notifications.js';
 import statsRoutes from './routes/stats.js';
 import deadlinesRoutes from './routes/deadlines.js';
 import usersRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/deadlines', deadlinesRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
