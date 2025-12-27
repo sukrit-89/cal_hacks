@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Users, UserMinus, UserPlus, Copy, Check, Crown, LogOut, Settings, FileText, Lightbulb } from 'lucide-react';
+import { Users, UserMinus, UserPlus, Copy, Check, Crown, LogOut, Settings, FileText, Lightbulb, QrCode, Download } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useTeamStore } from '../../stores/teamStore';
 import { Card } from '../../components/ui/Card';
@@ -192,6 +192,47 @@ export const TeamDetail = () => {
                         </div>
                     </Card>
                 </div>
+
+                {/* QR Code Section - Shows after RSVP */}
+                {team.qrCode && (
+                    <Card className="mt-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold flex items-center">
+                                <QrCode className="w-5 h-5 mr-2 text-primary" />
+                                Check-In QR Code
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = team.qrCode;
+                                    link.download = `team-${team.teamName}-qr.png`;
+                                    link.click();
+                                }}
+                                className="flex items-center space-x-2 text-sm text-primary hover:underline"
+                            >
+                                <Download className="w-4 h-4" />
+                                <span>Download</span>
+                            </button>
+                        </div>
+                        <div className="flex flex-col md:flex-row items-center gap-6">
+                            <div className="p-4 bg-white rounded-xl">
+                                <img
+                                    src={team.qrCode}
+                                    alt="Team QR Code"
+                                    className="w-48 h-48"
+                                />
+                            </div>
+                            <div className="flex-1 text-center md:text-left">
+                                <p className="text-gray-400 mb-2">
+                                    Show this QR code at the venue for check-in.
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                    Save this QR code to your device or take a screenshot for easy access on event day.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                )}
 
                 {/* Team Members */}
                 <Card className="mt-6">
