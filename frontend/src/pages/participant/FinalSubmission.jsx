@@ -188,11 +188,14 @@ export const FinalSubmission = () => {
                         </p>
 
                         <FileUpload
-                            label="Project Files (ZIP, EXE, etc.)"
+                            label="Project Files (ZIP, EXE, etc.) - Optional"
                             accept=".zip,.exe,.dmg,.apk"
                             endpoint="/uploads/executable"
                             onUploadComplete={(file) => setFormData({ ...formData, executableFile: file.url })}
                         />
+                        <p className="text-xs text-gray-400 mt-2">
+                            💡 File uploads are temporarily optional due to storage configuration.
+                        </p>
                     </Card>
 
                     {error && (

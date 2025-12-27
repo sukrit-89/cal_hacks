@@ -75,10 +75,11 @@ export const TeamSubmission = () => {
             return;
         }
 
-        if (!ideaPPT) {
-            setError('Idea presentation is required');
-            return;
-        }
+        // File uploads are now optional, removed validation
+        // if (!ideaPPT) {
+        //     setError('Idea presentation is required');
+        //     return;
+        // }
 
         for (let i = 0; i < formData.members.length; i++) {
             const member = formData.members[i];
@@ -86,10 +87,11 @@ export const TeamSubmission = () => {
                 setError(`GitHub URL required for member ${i + 1}`);
                 return;
             }
-            if (!member.resume) {
-                setError(`Resume required for member ${i + 1}`);
-                return;
-            }
+            // Resumes are now optional
+            // if (!member.resume) {
+            //     setError(`Resume required for member ${i + 1}`);
+            //     return;
+            // }
             if (!member.bio.trim()) {
                 setError(`Bio required for member ${i + 1}`);
                 return;
@@ -205,11 +207,14 @@ export const TeamSubmission = () => {
 
                         <div className="space-y-6">
                             <FileUpload
-                                label="Idea Deck (PPT/PDF)"
+                                label="Idea Deck (PPT/PDF) - Optional"
                                 accept=".ppt,.pptx,.pdf"
                                 endpoint="/uploads/ppt"
                                 onUploadComplete={(file) => setIdeaPPT(file.url)}
                             />
+                            <p className="text-xs text-gray-400 mt-2">
+                                💡 File uploads are temporarily optional. You can submit without uploading files.
+                            </p>
                         </div>
                     </Card>
 
@@ -267,11 +272,14 @@ export const TeamSubmission = () => {
                                         />
 
                                         <FileUpload
-                                            label="Resume (PDF)"
+                                            label="Resume (PDF) - Optional"
                                             accept=".pdf"
                                             endpoint="/uploads/resume"
                                             onUploadComplete={(file) => handleMemberChange(index, 'resume', file.url)}
                                         />
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            💡 Resume upload is optional for now
+                                        </p>
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-300 mb-2">
