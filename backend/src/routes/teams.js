@@ -65,7 +65,7 @@ router.post('/join', authenticate, isParticipant, async (req, res) => {
     try {
         const { teamCode, bio, githubUrl, linkedinUrl } = req.body;
 
-        const team = await getTeam(teamCode);
+        const team = await getTeamByCode(teamCode);
 
         if (!team) {
             return res.status(404).json({ error: 'Team not found with this code' });
