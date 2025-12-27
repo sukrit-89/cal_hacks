@@ -17,6 +17,7 @@ import TeamSubmission from './pages/participant/TeamSubmission';
 import TeamRSVP from './pages/participant/TeamRSVP';
 import FinalSubmission from './pages/participant/FinalSubmission';
 import Results from './pages/participant/Results';
+import TeamDetail from './pages/participant/TeamDetail';
 
 // Organizer pages
 import OrganizerDashboard from './pages/organizer/OrganizerDashboard';
@@ -134,6 +135,14 @@ function App() {
                         element={
                             <ProtectedRoute requiredRole="participant">
                                 <FinalSubmission />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/teams/:teamId"
+                        element={
+                            <ProtectedRoute requiredRole="participant">
+                                <TeamDetail />
                             </ProtectedRoute>
                         }
                     />

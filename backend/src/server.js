@@ -11,6 +11,7 @@ import aiRoutes from './routes/ai.js';
 import notificationRoutes from './routes/notifications.js';
 import statsRoutes from './routes/stats.js';
 import deadlinesRoutes from './routes/deadlines.js';
+import usersRoutes from './routes/users.js';
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/deadlines', deadlinesRoutes);
+app.use('/api/users', usersRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
