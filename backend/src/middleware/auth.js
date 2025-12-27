@@ -1,4 +1,5 @@
 import { auth } from '../config/firebase.js';
+import { getUser } from '../services/firestore.js';
 
 export const authenticate = async (req, res, next) => {
     try {
@@ -13,11 +14,20 @@ export const authenticate = async (req, res, next) => {
         // Verify the Firebase ID token
         const decodedToken = await auth.verifyIdToken(token);
 
+        // Try to get role from token custom claims first
+        let role = decodedToken.role;
+
+        // If role is not in token, fetch from Firestore
+        if (!role) {
+            const userData = await getUser(decodedToken.uid);
+            role = userData?.role || 'participant';
+        }
+
         // Attach user info to request
         req.user = {
             uid: decodedToken.uid,
             email: decodedToken.email,
-            role: decodedToken.role || 'participant' // Default role
+            role: role
         };
 
         next();

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Plus, X } from 'lucide-react';
+import { Users, Plus, X, Trash2 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -32,6 +32,24 @@ export const MentorManagement = ({ hackathonId }) => {
         }
     };
 
+    const handleDeleteMentor = async (mentorId, mentorName) => {
+        const confirmed = confirm(
+            `Are you sure you want to delete mentor "${mentorName}"?\n\nThis will also remove all their assignments.`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const response = await api.delete(`/mentors/${mentorId}`);
+            alert(`Mentor deleted successfully! ${response.data.deletedAssignments || 0} assignments removed.`);
+            fetchMentors();
+        } catch (error) {
+            console.error('Failed to delete mentor:', error);
+            const errorMessage = error.response?.data?.details || error.response?.data?.error || 'Unknown error';
+            alert(`Failed to delete mentor: ${errorMessage}`);
+        }
+    };
+
     const handleCreateMentor = async (e) => {
         e.preventDefault();
 
@@ -59,7 +77,7 @@ export const MentorManagement = ({ hackathonId }) => {
         }
 
         const confirmed = confirm(
-            'This will assign team PPTs to mentors based on their domains. Continue?'
+            'This will assign team PPTs to mentors based on their domains and send email notifications to each mentor. Continue?'
         );
 
         if (!confirmed) return;
@@ -68,19 +86,29 @@ export const MentorManagement = ({ hackathonId }) => {
             setDistributing(true);
             const response = await api.post(`/mentor/assign/${hackathonId}`);
             const summary = response.data.summary;
+            const emailResults = response.data.emailResults;
 
-            alert(
-                `Distribution complete!\n\n` +
+            let message = `Distribution complete!\n\n` +
                 `Teams processed: ${summary.totalTeams}\n` +
                 `Total assignments: ${summary.totalAssignments}\n` +
-                `Skipped teams: ${summary.skippedTeams.length}\n\n` +
-                `Check mentor loads in the list below.`
-            );
+                `Skipped teams: ${summary.skippedTeams.length}\n\n`;
+
+            if (emailResults) {
+                message += `📧 Emails sent: ${emailResults.sent}\n`;
+                if (emailResults.failed > 0) {
+                    message += `⚠️ Emails failed: ${emailResults.failed}\n`;
+                }
+            }
+
+            message += `\nCheck mentor loads in the list below.`;
+
+            alert(message);
 
             fetchMentors();
         } catch (error) {
             console.error('Distribution error:', error);
-            alert('Failed to distribute PPTs. See console for details.');
+            const errorMessage = error.response?.data?.error || 'Unknown error occurred';
+            alert(`Failed to distribute PPTs: ${errorMessage}`);
         } finally {
             setDistributing(false);
         }
@@ -154,6 +182,13 @@ export const MentorManagement = ({ hackathonId }) => {
                                         {mentor.assignedCount}/{mentor.maxLoad}
                                     </span>
                                 </div>
+                                <button
+                                    onClick={() => handleDeleteMentor(mentor.id, mentor.name)}
+                                    className="p-2 text-gray-400 hover:text-accent-red hover:bg-dark-hover rounded transition-colors"
+                                    title="Delete mentor"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -211,8 +246,8 @@ export const MentorManagement = ({ hackathonId }) => {
                                             type="button"
                                             onClick={() => toggleDomain(domain)}
                                             className={`px-3 py-1 rounded text-sm transition-colors ${formData.domains.includes(domain)
-                                                    ? 'bg-primary text-white'
-                                                    : 'bg-dark-hover text-gray-400 hover:bg-dark-hover/70'
+                                                ? 'bg-primary text-white'
+                                                : 'bg-dark-hover text-gray-400 hover:bg-dark-hover/70'
                                                 }`}
                                         >
                                             {domain}

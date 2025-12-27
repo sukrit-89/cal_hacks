@@ -284,6 +284,27 @@ export const updateMentor = async (mentorId, updates) => {
     await db.collection('mentors').doc(mentorId).update(updates);
 };
 
+export const deleteMentor = async (mentorId) => {
+    await db.collection('mentors').doc(mentorId).delete();
+};
+
+export const deleteAssignmentsByMentor = async (mentorId) => {
+    const snapshot = await db.collection('mentorAssignments')
+        .where('mentorId', '==', mentorId)
+        .get();
+
+    // If no assignments, return 0
+    if (snapshot.empty) {
+        return 0;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+
+    return snapshot.docs.length;
+};
+
 export const getMentorsByDomain = async (domain) => {
     const snapshot = await db.collection('mentors')
         .where('domains', 'array-contains', domain)

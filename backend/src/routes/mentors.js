@@ -6,16 +6,21 @@ import {
     getMentor,
     getAllMentors,
     updateMentor,
+    deleteMentor,
+    deleteAssignmentsByMentor,
     getMentorsByDomain,
     createMentorAssignment,
     getAssignmentsByMentor,
     getAssignmentsByHackathon,
+    getAssignmentsByTeam,
     getTeamsByHackathon,
     getTeam,
     updateTeam,
-    updateAssignmentStatus
+    updateAssignmentStatus,
+    getHackathon
 } from '../services/firestore.js';
 import { extractDomains } from '../utils/aiDomainExtractor.js';
+import { sendMentorAssignmentEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -119,6 +124,43 @@ router.put('/:id', authenticate, isOrganizer, async (req, res) => {
     }
 });
 
+// Delete mentor (organizer only)
+router.delete('/:id', authenticate, isOrganizer, async (req, res) => {
+    try {
+        const mentorId = req.params.id;
+
+        if (!mentorId) {
+            return res.status(400).json({ error: 'Mentor ID is required' });
+        }
+
+        const mentor = await getMentor(mentorId);
+
+        if (!mentor) {
+            return res.status(404).json({ error: 'Mentor not found' });
+        }
+
+        // Delete all assignments associated with this mentor
+        let deletedAssignments = 0;
+        try {
+            deletedAssignments = await deleteAssignmentsByMentor(mentorId);
+        } catch (assignmentError) {
+            console.error('Error deleting assignments:', assignmentError);
+            // Continue with mentor deletion even if assignment deletion fails
+        }
+
+        // Delete the mentor
+        await deleteMentor(mentorId);
+
+        res.json({
+            message: 'Mentor deleted successfully',
+            deletedAssignments
+        });
+    } catch (error) {
+        console.error('Delete mentor error:', error);
+        res.status(500).json({ error: 'Failed to delete mentor', details: error.message });
+    }
+});
+
 // Distribute PPTs to mentors (organizer only)
 router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) => {
     try {
@@ -132,6 +174,15 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
             return res.status(400).json({ error: 'No teams found for this hackathon' });
         }
 
+        // Fetch all mentors upfront and build a load tracker
+        const allMentors = await getAllMentors();
+        const mentorLoadTracker = {};
+
+        // Initialize load tracker with current assigned counts
+        for (const mentor of allMentors) {
+            mentorLoadTracker[mentor.id] = mentor.assignedCount || 0;
+        }
+
         const assignmentSummary = {
             totalTeams: 0,
             totalAssignments: 0,
@@ -139,9 +190,6 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
             mentorLoads: {},
             errors: []
         };
-
-        // Track mentor loads in memory for deterministic distribution
-        const mentorLoadTracker = {};
 
         for (const team of teams) {
             // Check if team has idea submission (description is required, PPT is optional)
@@ -152,6 +200,21 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
                     teamId: team.id,
                     teamName: team.teamName,
                     reason: 'No idea description submitted'
+                });
+                continue;
+            }
+
+            // Check if team already has assignments for this hackathon
+            const existingAssignments = await getAssignmentsByTeam(team.id);
+            const existingHackathonAssignments = existingAssignments.filter(
+                a => a.hackathonId === hackathonId
+            );
+
+            if (existingHackathonAssignments.length > 0) {
+                assignmentSummary.skippedTeams.push({
+                    teamId: team.id,
+                    teamName: team.teamName,
+                    reason: 'Team already has mentor assignments'
                 });
                 continue;
             }
@@ -177,8 +240,10 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
 
                 // For each domain, find and assign a mentor
                 for (const domain of extractedDomains) {
-                    // Get mentors for this domain, sorted by assignedCount
-                    const eligibleMentors = await getMentorsByDomain(domain);
+                    // Get mentors for this domain from allMentors
+                    const eligibleMentors = allMentors.filter(
+                        m => m.domains && m.domains.includes(domain)
+                    );
 
                     if (eligibleMentors.length === 0) {
                         assignmentSummary.errors.push({
@@ -189,10 +254,17 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
                         continue;
                     }
 
+                    // Sort by current load (using tracker) to find mentor with lowest load
+                    const sortedMentors = [...eligibleMentors].sort((a, b) => {
+                        const loadA = mentorLoadTracker[a.id] || 0;
+                        const loadB = mentorLoadTracker[b.id] || 0;
+                        return loadA - loadB;
+                    });
+
                     // Find first mentor with available capacity
                     let selectedMentor = null;
-                    for (const mentor of eligibleMentors) {
-                        const currentLoad = mentorLoadTracker[mentor.id] ?? mentor.assignedCount;
+                    for (const mentor of sortedMentors) {
+                        const currentLoad = mentorLoadTracker[mentor.id] || 0;
                         if (currentLoad < mentor.maxLoad) {
                             selectedMentor = mentor;
                             break;
@@ -208,6 +280,12 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
                         continue;
                     }
 
+                    // Check if this mentor is already assigned to this team (avoid duplicate domain assignments)
+                    if (assignedMentors.includes(selectedMentor.id)) {
+                        // Mentor already assigned to this team, skip creating duplicate
+                        continue;
+                    }
+
                     // Create assignment
                     const assignmentId = await createMentorAssignment({
                         mentorId: selectedMentor.id,
@@ -219,8 +297,8 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
                     assignmentRecords.push(assignmentId);
                     assignedMentors.push(selectedMentor.id);
 
-                    // Update load tracker
-                    mentorLoadTracker[selectedMentor.id] = (mentorLoadTracker[selectedMentor.id] ?? selectedMentor.assignedCount) + 1;
+                    // Update load tracker immediately
+                    mentorLoadTracker[selectedMentor.id] = (mentorLoadTracker[selectedMentor.id] || 0) + 1;
 
                     assignmentSummary.totalAssignments++;
                 }
@@ -246,9 +324,73 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
             assignmentSummary.mentorLoads[mentorId] = newCount;
         }
 
+        // Send emails to mentors with their assignments (non-blocking)
+        const emailResults = { sent: 0, failed: 0, skipped: 0, errors: [] };
+
+        // Check if email is configured
+        const emailConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD;
+
+        if (!emailConfigured) {
+            console.log('Email not configured - skipping email notifications');
+            emailResults.skipped = Object.keys(mentorLoadTracker).length;
+        } else {
+            // Get hackathon details for email
+            const hackathon = await getHackathon(hackathonId);
+            const hackathonName = hackathon?.title || 'Hackathon';
+
+            // Get all assignments for this hackathon grouped by mentor
+            const allAssignments = await getAssignmentsByHackathon(hackathonId);
+            const assignmentsByMentor = {};
+
+            for (const assignment of allAssignments) {
+                if (!assignmentsByMentor[assignment.mentorId]) {
+                    assignmentsByMentor[assignment.mentorId] = [];
+                }
+
+                // Get team details for the email
+                const team = await getTeam(assignment.teamId);
+                assignmentsByMentor[assignment.mentorId].push({
+                    teamId: assignment.teamId,
+                    teamName: team?.teamName || 'Unknown Team',
+                    ideaTitle: team?.submissions?.idea?.title || 'Untitled',
+                    domain: assignment.domain,
+                    pptUrl: team?.submissions?.idea?.pptUrl || null
+                });
+            }
+
+            // Send email to each mentor with assignments (with timeout)
+            const emailPromises = Object.entries(assignmentsByMentor).map(async ([mentorId, mentorAssignments]) => {
+                try {
+                    const mentor = await getMentor(mentorId);
+                    if (mentor && mentor.email) {
+                        // Add timeout of 10 seconds per email
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Email timeout')), 10000)
+                        );
+
+                        await Promise.race([
+                            sendMentorAssignmentEmail(mentor, mentorAssignments, hackathonName),
+                            timeoutPromise
+                        ]);
+
+                        emailResults.sent++;
+                        console.log(`Email sent to mentor: ${mentor.email}`);
+                    }
+                } catch (emailError) {
+                    console.error(`Failed to send email to mentor ${mentorId}:`, emailError.message);
+                    emailResults.failed++;
+                    emailResults.errors.push({ mentorId, error: emailError.message });
+                }
+            });
+
+            // Wait for all emails but don't let it block forever
+            await Promise.allSettled(emailPromises);
+        }
+
         res.json({
             message: 'PPT distribution completed',
-            summary: assignmentSummary
+            summary: assignmentSummary,
+            emailResults
         });
 
     } catch (error) {

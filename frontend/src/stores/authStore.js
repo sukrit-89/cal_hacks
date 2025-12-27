@@ -42,16 +42,18 @@ export const useAuthStore = create((set, get) => ({
 
             // Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const token = await userCredential.user.getIdToken();
-            localStorage.setItem('authToken', token);
 
-            // Create user in backend
+            // Create user in backend (this sets custom claims)
             const response = await api.post('/auth/signup', {
                 uid: userCredential.user.uid,
                 email,
                 displayName,
                 role
             });
+
+            // Force refresh token to get updated custom claims
+            const token = await userCredential.user.getIdToken(true); // true forces refresh
+            localStorage.setItem('authToken', token);
 
             set({ user: response.data.user, loading: false });
             return response.data.user;
@@ -67,7 +69,8 @@ export const useAuthStore = create((set, get) => ({
             set({ loading: true, error: null });
 
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const token = await userCredential.user.getIdToken();
+            // Force refresh to get latest custom claims
+            const token = await userCredential.user.getIdToken(true);
             localStorage.setItem('authToken', token);
 
             // Get user data
