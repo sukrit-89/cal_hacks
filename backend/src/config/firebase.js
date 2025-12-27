@@ -11,7 +11,7 @@ dotenv.config();
 
 // Import service account key
 const require = createRequire(import.meta.url);
-const serviceAccount = require('./serviceAccountkey.json');
+const serviceAccount = require('./ServiceAccount.json');
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
