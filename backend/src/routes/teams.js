@@ -63,9 +63,9 @@ router.post('/', authenticate, isParticipant, async (req, res) => {
 // Join team with code (participant only)
 router.post('/join', authenticate, isParticipant, async (req, res) => {
     try {
-        const { teamCode } = req.body;
+        const { teamCode, bio, linkedinUrl } = req.body;
 
-        const team = await getTeamByCode(teamCode);
+        const team = await getTeam(teamCode);
 
         if (!team) {
             return res.status(404).json({ error: 'Team not found with this code' });
@@ -78,11 +78,25 @@ router.post('/join', authenticate, isParticipant, async (req, res) => {
 
         // Add user to team members
         const updatedMembers = [...team.members, req.user.uid];
-        await updateTeam(team.id, { members: updatedMembers });
+
+        // Initialize teamBios array if it doesn't exist
+        const teamBios = team.teamBios || [];
+
+        // Add member's bio and LinkedIn
+        teamBios.push({
+            userId: req.user.uid,
+            bio: bio || '',
+            linkedinUrl: linkedinUrl || ''
+        });
+
+        await updateTeam(team.id, {
+            members: updatedMembers,
+            teamBios: teamBios
+        });
 
         res.json({
             message: 'Successfully joined team',
-            team: { ...team, members: updatedMembers }
+            team: { ...team, members: updatedMembers, teamBios }
         });
     } catch (error) {
         console.error('Join team error:', error);

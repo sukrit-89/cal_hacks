@@ -21,10 +21,13 @@ export const useTeamStore = create((set, get) => ({
     },
 
     // Join team
-    joinTeam: async (teamCode) => {
+    joinTeam: async (teamCode, memberProfile = {}) => {
         try {
             set({ loading: true, error: null });
-            const response = await api.post('/teams/join', { teamCode });
+            const response = await api.post('/teams/join', {
+                teamCode,
+                ...memberProfile
+            });
             set({ currentTeam: response.data.team, loading: false });
             return response.data.team;
         } catch (error) {

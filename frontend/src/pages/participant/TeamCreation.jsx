@@ -13,6 +13,8 @@ export const TeamCreation = () => {
     const [mode, setMode] = useState('create'); // 'create' or 'join'
     const [teamName, setTeamName] = useState('');
     const [teamCode, setTeamCode] = useState('');
+    const [memberBio, setMemberBio] = useState('');
+    const [memberLinkedIn, setMemberLinkedIn] = useState('');
     const [error, setError] = useState('');
 
     const handleCreateTeam = async (e) => {
@@ -41,8 +43,16 @@ export const TeamCreation = () => {
             return;
         }
 
+        if (!memberBio.trim()) {
+            setError('Please tell us about yourself');
+            return;
+        }
+
         try {
-            const team = await joinTeam(teamCode.toUpperCase());
+            const team = await joinTeam(teamCode.toUpperCase(), {
+                bio: memberBio,
+                linkedinUrl: memberLinkedIn
+            });
             navigate(`/teams/${team.id}`);
         } catch (err) {
             setError(err.message || 'Failed to join team');
@@ -62,8 +72,8 @@ export const TeamCreation = () => {
                     <button
                         onClick={() => setMode('create')}
                         className={`p-6 rounded-xl border-2 transition-all ${mode === 'create'
-                                ? 'border-primary bg-primary/10'
-                                : 'border-dark-border hover:border-primary/50'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-dark-border hover:border-primary/50'
                             }`}
                     >
                         <Plus className="w-8 h-8 mx-auto mb-3 text-primary" />
@@ -74,8 +84,8 @@ export const TeamCreation = () => {
                     <button
                         onClick={() => setMode('join')}
                         className={`p-6 rounded-xl border-2 transition-all ${mode === 'join'
-                                ? 'border-primary bg-primary/10'
-                                : 'border-dark-border hover:border-primary/50'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-dark-border hover:border-primary/50'
                             }`}
                     >
                         <Users className="w-8 h-8 mx-auto mb-3 text-primary" />
@@ -136,7 +146,7 @@ export const TeamCreation = () => {
                             <div>
                                 <h2 className="text-2xl font-bold mb-4">Join a Team</h2>
                                 <p className="text-gray-400 mb-6">
-                                    Enter the 6-character team code shared by your team leader.
+                                    Enter the team code and your details to join
                                 </p>
                             </div>
 
@@ -150,6 +160,36 @@ export const TeamCreation = () => {
                                 className="text-center text-2xl font-mono tracking-wider"
                                 required
                             />
+
+                            <div className="pt-4 border-t border-dark-border">
+                                <h3 className="text-lg font-semibold mb-4">Your Profile</h3>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                                            Bio <span className="text-accent-red">*</span>
+                                        </label>
+                                        <textarea
+                                            value={memberBio}
+                                            onChange={(e) => setMemberBio(e.target.value)}
+                                            placeholder="Tell us about yourself, your skills, and what you bring to the team..."
+                                            className="input-field min-h-[120px] resize-y"
+                                            required
+                                        />
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            {memberBio.length} characters
+                                        </p>
+                                    </div>
+
+                                    <Input
+                                        label="LinkedIn Profile (Optional)"
+                                        type="url"
+                                        value={memberLinkedIn}
+                                        onChange={(e) => setMemberLinkedIn(e.target.value)}
+                                        placeholder="https://linkedin.com/in/username"
+                                    />
+                                </div>
+                            </div>
 
                             <div className="p-4 bg-dark-bg rounded-lg">
                                 <p className="text-sm text-gray-400">
