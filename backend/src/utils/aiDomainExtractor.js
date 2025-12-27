@@ -5,7 +5,7 @@ dotenv.config();
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' }); // Use latest stable model
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' }); // Use stable v1beta model
 
 /**
  * AI-powered domain classification using Google Gemini

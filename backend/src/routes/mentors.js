@@ -20,7 +20,7 @@ import {
     getHackathon
 } from '../services/firestore.js';
 import { extractDomains } from '../utils/aiDomainExtractor.js';
-import { sendMentorAssignmentEmail } from '../services/emailService.js';
+import { sendMentorAssignmentEmail } from '../services/emailServiceResend.js';
 
 const router = express.Router();
 
@@ -327,12 +327,22 @@ router.post('/assign/:hackathonId', authenticate, isOrganizer, async (req, res) 
         // Send emails to mentors with their assignments (non-blocking)
         const emailResults = { sent: 0, failed: 0, skipped: 0, errors: [] };
 
-        // Check if email is configured
-        const emailConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD;
+        // Check if Resend is configured
+        const emailEnabled = process.env.ENABLE_EMAIL !== 'false';
+        const resendConfigured = !!process.env.RESEND_API_KEY;
 
-        if (!emailConfigured) {
-            console.log('Email not configured - skipping email notifications');
+        if (!emailEnabled || !resendConfigured) {
+            const reason = !emailEnabled
+                ? 'Email disabled via ENABLE_EMAIL=false'
+                : 'Resend API key not configured';
+            console.log(`📧 Skipping email notifications - ${reason}`);
             emailResults.skipped = Object.keys(mentorLoadTracker).length;
+            res.json({
+                message: 'PPT distribution completed',
+                summary: assignmentSummary,
+                emailResults
+            });
+            return; // Skip email sending entirely
         } else {
             // Get hackathon details for email
             const hackathon = await getHackathon(hackathonId);

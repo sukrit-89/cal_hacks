@@ -1,41 +1,28 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create transporter using SMTP with SSL (port 465)
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // Use SSL
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD // Use App Password for Gmail
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Send email
- * @param {Object} options - Email options
- * @param {string} options.to - Recipient email
- * @param {string} options.subject - Email subject
- * @param {string} options.html - HTML content
- * @param {string} options.text - Plain text content (optional)
- * @returns {Promise<Object>} Send result
+ * Send email using Resend API
+ * Much easier than Gmail SMTP - no firewall issues!
  */
-export const sendEmail = async ({ to, subject, html, text }) => {
+export const sendEmail = async ({ to, subject, html }) => {
     try {
-        const mailOptions = {
-            from: `"HackSpire Platform" <${process.env.EMAIL_USER}>`,
+        // Use verified email from env, or default to Resend's test address
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+        const result = await resend.emails.send({
+            from: `Hackathon Platform <${fromEmail}>`,
             to,
             subject,
-            html,
-            text: text || html.replace(/<[^>]*>/g, '') // Strip HTML for plain text
-        };
+            html
+        });
 
-        const result = await transporter.sendMail(mailOptions);
-        console.log(`Email sent to ${to}: ${result.messageId}`);
-        return { success: true, messageId: result.messageId };
+        console.log(`Email sent to ${to}: ${result.id || 'sent'}`);
+        return { success: true, messageId: result.id };
     } catch (error) {
         console.error('Email send error:', error);
         throw error;
@@ -44,9 +31,6 @@ export const sendEmail = async ({ to, subject, html, text }) => {
 
 /**
  * Send mentor assignment email with PPT links
- * @param {Object} mentor - Mentor data
- * @param {Array} assignments - Array of assigned teams with PPT info
- * @param {string} hackathonName - Name of the hackathon
  */
 export const sendMentorAssignmentEmail = async (mentor, assignments, hackathonName) => {
     const teamRows = assignments.map((assignment, index) => `
@@ -118,20 +102,6 @@ export const sendMentorAssignmentEmail = async (mentor, assignments, hackathonNa
                         </p>
                     </div>
                     
-                    <!-- CTA Button -->
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/mentor/dashboard" 
-                           style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); 
-                                  color: white; 
-                                  padding: 14px 30px; 
-                                  text-decoration: none; 
-                                  border-radius: 6px; 
-                                  font-weight: bold;
-                                  display: inline-block;">
-                            Go to Mentor Dashboard
-                        </a>
-                    </div>
-                    
                     <p style="color: #666; font-size: 14px; line-height: 1.6;">
                         Please login to your mentor dashboard to mark submissions as reviewed after evaluation.
                     </p>
@@ -156,18 +126,13 @@ export const sendMentorAssignmentEmail = async (mentor, assignments, hackathonNa
     });
 };
 
-/**
- * Verify email configuration
- */
 export const verifyEmailConfig = async () => {
-    try {
-        await transporter.verify();
-        console.log('✅ Email service is configured correctly');
-        return true;
-    } catch (error) {
-        console.error('❌ Email configuration error:', error.message);
+    if (!process.env.RESEND_API_KEY) {
+        console.error('❌ RESEND_API_KEY not configured');
         return false;
     }
+    console.log('✅ Resend API configured');
+    return true;
 };
 
 export default {
