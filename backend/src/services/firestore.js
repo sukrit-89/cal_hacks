@@ -42,8 +42,12 @@ export const getAllHackathons = async (filters = {}) => {
         query = query.where('organizerId', '==', filters.organizerId);
     }
 
-    const snapshot = await query.orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Get results without orderBy to avoid composite index requirement
+    const snapshot = await query.get();
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Sort in memory by createdAt
+    return docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 };
 
 export const updateHackathon = async (hackathonId, updates) => {
@@ -111,10 +115,11 @@ export const saveEvaluation = async (evaluationData) => {
 export const getEvaluationsByTeam = async (teamId) => {
     const snapshot = await db.collection('evaluations')
         .where('teamId', '==', teamId)
-        .orderBy('evaluatedAt', 'desc')
         .get();
 
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory to avoid composite index requirement
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return docs.sort((a, b) => new Date(b.evaluatedAt) - new Date(a.evaluatedAt));
 };
 
 export const getEvaluationsByHackathon = async (hackathonId, type = null) => {
@@ -175,10 +180,11 @@ export const getTeamInvites = async (userId) => {
     const snapshot = await db.collection('team_invites')
         .where('invitedUser', '==', userId)
         .where('status', '==', 'pending')
-        .orderBy('createdAt', 'desc')
         .get();
 
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory to avoid composite index requirement
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 };
 
 export const updateInviteStatus = async (inviteId, status) => {
