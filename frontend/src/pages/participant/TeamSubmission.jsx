@@ -27,6 +27,7 @@ export const TeamSubmission = () => {
             // Initialize profiles for each existing team member
             const profiles = currentTeam.members.map(() => ({
                 bio: '',
+                githubUrl: '',
                 linkedinUrl: ''
             }));
             setMemberProfiles(profiles);
@@ -43,10 +44,14 @@ export const TeamSubmission = () => {
         e.preventDefault();
         setError('');
 
-        // Validation - only bio is required
+        // Validation - bio and GitHub are required
         for (let i = 0; i < memberProfiles.length; i++) {
             if (!memberProfiles[i].bio.trim()) {
                 setError(`Bio is required for member ${i + 1}`);
+                return;
+            }
+            if (!memberProfiles[i].githubUrl.trim()) {
+                setError(`GitHub URL is required for member ${i + 1}`);
                 return;
             }
         }
@@ -163,6 +168,15 @@ export const TeamSubmission = () => {
                                                 {profile.bio.length} characters
                                             </p>
                                         </div>
+
+                                        <Input
+                                            label="GitHub Profile"
+                                            type="url"
+                                            value={profile.githubUrl}
+                                            onChange={(e) => handleProfileChange(index, 'githubUrl', e.target.value)}
+                                            placeholder="https://github.com/username"
+                                            required
+                                        />
 
                                         <Input
                                             label="LinkedIn Profile (Optional)"
