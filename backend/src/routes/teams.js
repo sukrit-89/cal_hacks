@@ -178,13 +178,13 @@ router.post('/:id/submit', authenticate, isParticipant, async (req, res) => {
             return res.status(403).json({ error: 'Only team leader can submit registration' });
         }
 
-        const { projectDetails, documents, teamBios } = req.body;
+        const { teamBios } = req.body;
 
+        // Simple submission - just team member bios
+        // Project details will be added during final submission
         const submissions = {
             initial: {
-                projectDetails,
-                documents,
-                teamBios,
+                teamBios: teamBios || team.teamBios || [], // Use provided or existing
                 submittedAt: new Date().toISOString()
             }
         };
