@@ -24,6 +24,28 @@ export const Signup = () => {
         e.preventDefault();
         setError('');
 
+        // Trim whitespace from email
+        const trimmedEmail = formData.email.trim();
+        const trimmedDisplayName = formData.displayName.trim();
+
+        // Validate email format
+        if (!trimmedEmail) {
+            setError('Email is required');
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+            setError('Please enter a valid email address');
+            return;
+        }
+
+        // Validate display name
+        if (!trimmedDisplayName) {
+            setError('Full name is required');
+            return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
             setError('Passwords do not match');
             return;
@@ -36,9 +58,9 @@ export const Signup = () => {
 
         try {
             const user = await signUp(
-                formData.email,
+                trimmedEmail,
                 formData.password,
-                formData.displayName,
+                trimmedDisplayName,
                 formData.role
             );
 
@@ -49,7 +71,17 @@ export const Signup = () => {
                 navigate('/dashboard');
             }
         } catch (err) {
-            setError(err.message || 'Failed to create account');
+            console.error('Signup error:', err);
+            // Show more user-friendly error messages
+            if (err.code === 'auth/email-already-in-use') {
+                setError('This email is already registered. Please sign in instead.');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('Invalid email address format. Please check and try again.');
+            } else if (err.code === 'auth/weak-password') {
+                setError('Password is too weak. Please use at least 6 characters.');
+            } else {
+                setError(err.message || 'Failed to create account. Please try again.');
+            }
         }
     };
 
@@ -112,8 +144,8 @@ export const Signup = () => {
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'participant' })}
                                     className={`p-4 rounded-lg border-2 transition-all ${formData.role === 'participant'
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-dark-border hover:border-primary/50'
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-dark-border hover:border-primary/50'
                                         }`}
                                 >
                                     <div className="font-semibold">Participant</div>
@@ -123,8 +155,8 @@ export const Signup = () => {
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'organizer' })}
                                     className={`p-4 rounded-lg border-2 transition-all ${formData.role === 'organizer'
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-dark-border hover:border-primary/50'
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-dark-border hover:border-primary/50'
                                         }`}
                                 >
                                     <div className="font-semibold">Organizer</div>

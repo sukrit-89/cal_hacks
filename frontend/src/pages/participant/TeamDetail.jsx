@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Users, UserMinus, UserPlus, Copy, Check, Crown, LogOut, Settings } from 'lucide-react';
+import { Users, UserMinus, UserPlus, Copy, Check, Crown, LogOut, Settings, FileText, Lightbulb } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useTeamStore } from '../../stores/teamStore';
 import { Card } from '../../components/ui/Card';
@@ -248,6 +248,40 @@ export const TeamDetail = () => {
                             </div>
                         ))}
                     </div>
+                </Card>
+
+                {/* Quick Actions for Team Leader */}
+                {/* TEMPORARILY SHOWING FOR ALL MEMBERS FOR DEBUGGING */}
+                <Card className="mt-6">
+                    <h3 className="font-bold mb-4">Team Submissions</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <Button
+                            variant="secondary"
+                            className="w-full"
+                            onClick={() => navigate(`/teams/${teamId}/submit`)}
+                        >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Team Registration
+                            {team.submissions?.initial && (
+                                <Check className="w-4 h-4 ml-2 text-accent-green" />
+                            )}
+                        </Button>
+
+                        <Button
+                            variant="primary"
+                            className="w-full"
+                            onClick={() => navigate(`/teams/${teamId}/idea`)}
+                        >
+                            <Lightbulb className="w-4 h-4 mr-2" />
+                            Submit Idea PPT
+                            {team.submissions?.idea && (
+                                <Check className="w-4 h-4 ml-2 text-accent-green" />
+                            )}
+                        </Button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">
+                        📌 Submit your team profiles first, then upload your Idea PPT for mentor review
+                    </p>
                 </Card>
 
                 {/* Actions */}

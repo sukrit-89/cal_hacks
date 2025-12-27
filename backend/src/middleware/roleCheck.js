@@ -18,6 +18,8 @@ export const requireRole = (...allowedRoles) => {
 
 export const isOrganizer = requireRole('organizer');
 export const isParticipant = requireRole('participant');
+export const isMentor = requireRole('mentor');
 export const isAnyUser = requireRole('organizer', 'participant');
+export const isOrganizerOrMentor = requireRole('organizer', 'mentor');
 
 export default requireRole;

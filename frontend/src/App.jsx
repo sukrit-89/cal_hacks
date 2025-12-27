@@ -14,6 +14,7 @@ import Signup from './pages/auth/Signup';
 import ParticipantDashboard from './pages/participant/ParticipantDashboard';
 import TeamCreation from './pages/participant/TeamCreation';
 import TeamSubmission from './pages/participant/TeamSubmission';
+import IdeaSubmission from './pages/participant/IdeaSubmission';
 import TeamRSVP from './pages/participant/TeamRSVP';
 import FinalSubmission from './pages/participant/FinalSubmission';
 import Results from './pages/participant/Results';
@@ -23,6 +24,9 @@ import TeamDetail from './pages/participant/TeamDetail';
 import OrganizerDashboard from './pages/organizer/OrganizerDashboard';
 import CreateHackathon from './pages/organizer/CreateHackathon';
 import Analytics from './pages/organizer/Analytics';
+
+// Mentor pages
+import MentorDashboard from './pages/mentor/MentorDashboard';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -123,6 +127,14 @@ function App() {
                         }
                     />
                     <Route
+                        path="/teams/:teamId/idea"
+                        element={
+                            <ProtectedRoute requiredRole="participant">
+                                <IdeaSubmission />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/teams/:teamId/rsvp"
                         element={
                             <ProtectedRoute requiredRole="participant">
@@ -180,6 +192,16 @@ function App() {
                         element={
                             <ProtectedRoute requiredRole="organizer">
                                 <Analytics />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Mentor routes */}
+                    <Route
+                        path="/mentor/dashboard"
+                        element={
+                            <ProtectedRoute requiredRole="mentor">
+                                <MentorDashboard />
                             </ProtectedRoute>
                         }
                     />

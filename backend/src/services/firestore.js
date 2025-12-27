@@ -255,8 +255,92 @@ export const getUserDeadlines = async (userId) => {
     // Filter out past deadlines and sort by date
     const now = new Date();
     return deadlines
+
         .filter(d => new Date(d.time) > now)
         .sort((a, b) => new Date(a.time) - new Date(b.time));
+};
+
+// Mentor operations
+export const createMentor = async (mentorData) => {
+    const docRef = await db.collection('mentors').add({
+        ...mentorData,
+        assignedCount: 0,
+        createdAt: new Date().toISOString()
+    });
+    return docRef.id;
+};
+
+export const getMentor = async (mentorId) => {
+    const doc = await db.collection('mentors').doc(mentorId).get();
+    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+};
+
+export const getAllMentors = async () => {
+    const snapshot = await db.collection('mentors').get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+export const updateMentor = async (mentorId, updates) => {
+    await db.collection('mentors').doc(mentorId).update(updates);
+};
+
+export const getMentorsByDomain = async (domain) => {
+    const snapshot = await db.collection('mentors')
+        .where('domains', 'array-contains', domain)
+        .get();
+
+    // Sort by assignedCount in memory for deterministic load balancing
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return docs.sort((a, b) => a.assignedCount - b.assignedCount);
+};
+
+// Mentor assignment operations
+export const createMentorAssignment = async (assignmentData) => {
+    const docRef = await db.collection('mentorAssignments').add({
+        ...assignmentData,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+    });
+    return docRef.id;
+};
+
+export const getAssignmentsByMentor = async (mentorId, status = null) => {
+    let query = db.collection('mentorAssignments')
+        .where('mentorId', '==', mentorId);
+
+    if (status) {
+        query = query.where('status', '==', status);
+    }
+
+    const snapshot = await query.get();
+    const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Sort by createdAt in memory
+    return docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+};
+
+export const getAssignmentsByHackathon = async (hackathonId) => {
+    const snapshot = await db.collection('mentorAssignments')
+        .where('hackathonId', '==', hackathonId)
+        .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+export const getAssignmentsByTeam = async (teamId) => {
+    const snapshot = await db.collection('mentorAssignments')
+        .where('teamId', '==', teamId)
+        .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+};
+
+export const updateAssignmentStatus = async (assignmentId, status) => {
+    const updates = {
+        status,
+        ...(status === 'reviewed' && { reviewedAt: new Date().toISOString() })
+    };
+    await db.collection('mentorAssignments').doc(assignmentId).update(updates);
 };
 
 export default {
@@ -282,6 +366,16 @@ export default {
     getTeamInvites,
     updateInviteStatus,
     getUserInviteCount,
-    getUserDeadlines
+    getUserDeadlines,
+    createMentor,
+    getMentor,
+    getAllMentors,
+    updateMentor,
+    getMentorsByDomain,
+    createMentorAssignment,
+    getAssignmentsByMentor,
+    getAssignmentsByHackathon,
+    getAssignmentsByTeam,
+    updateAssignmentStatus
 };
 

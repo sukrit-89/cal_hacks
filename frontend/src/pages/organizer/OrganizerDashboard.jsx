@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { TeamDetailModal } from '../../components/organizer/TeamDetailModal';
+import { MentorManagement } from '../../components/organizer/MentorManagement';
 import api from '../../services/api';
 
 export const OrganizerDashboard = () => {
@@ -429,6 +430,11 @@ export const OrganizerDashboard = () => {
                                 </Button>
                             </div>
                         </Card>
+
+                        {/* Mentor Management */}
+                        {selectedHackathon && (
+                            <MentorManagement hackathonId={selectedHackathon.id} />
+                        )}
                     </div>
                 </div>
             </div>

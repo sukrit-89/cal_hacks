@@ -32,7 +32,14 @@ export const Sidebar = ({ role = 'participant' }) => {
         { to: '/organizer/settings', icon: Settings, label: 'Settings' }
     ];
 
-    const links = role === 'organizer' ? organizerLinks : participantLinks;
+    const mentorLinks = [
+        { to: '/mentor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { to: '/settings', icon: Settings, label: 'Settings' }
+    ];
+
+    const links = role === 'organizer' ? organizerLinks :
+        role === 'mentor' ? mentorLinks :
+            participantLinks;
 
     return (
         <aside className="fixed left-0 top-0 h-screen w-64 bg-dark-card border-r border-dark-border flex flex-col z-30">

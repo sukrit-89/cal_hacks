@@ -199,6 +199,49 @@ router.post('/:id/submit', authenticate, isParticipant, async (req, res) => {
     }
 });
 
+// Submit idea (PPT + description)
+router.post('/:id/idea-submit', authenticate, isParticipant, async (req, res) => {
+    try {
+        const team = await getTeam(req.params.id);
+
+        if (!team) {
+            return res.status(404).json({ error: 'Team not found' });
+        }
+
+        if (team.leaderId !== req.user.uid) {
+            return res.status(403).json({ error: 'Only team leader can submit idea' });
+        }
+
+        const { title, description, pptUrl } = req.body;
+
+        if (!title || !description) {
+            return res.status(400).json({ error: 'Title and description are required' });
+        }
+
+        // Update team with idea submission (pptUrl is optional)
+        const ideaSubmission = {
+            title,
+            description,
+            pptUrl,
+            submittedAt: new Date().toISOString()
+        };
+
+        // Merge with existing submissions
+        const existingSubmissions = team.submissions || {};
+        await updateTeam(req.params.id, {
+            submissions: {
+                ...existingSubmissions,
+                idea: ideaSubmission
+            }
+        });
+
+        res.json({ message: 'Idea submitted successfully' });
+    } catch (error) {
+        console.error('Submit idea error:', error);
+        res.status(500).json({ error: 'Failed to submit idea' });
+    }
+});
+
 // RSVP for hackathon
 router.post('/:id/rsvp', authenticate, isParticipant, async (req, res) => {
     try {
