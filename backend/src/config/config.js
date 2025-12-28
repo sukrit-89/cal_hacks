@@ -18,6 +18,10 @@ export const config = {
         preEvalUrl: process.env.AXICOV_PRE_EVAL_URL,
         finalEvalUrl: process.env.AXICOV_FINAL_EVAL_URL,
         apiKey: process.env.AXICOV_API_KEY
+    },
+
+    openai: {
+        apiKey: process.env.OPENAI_API_KEY
     }
 };
 
