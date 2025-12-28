@@ -1,14 +1,14 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' }); // Use stable v1beta model
+// OpenRouter API configuration
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API;
 
 /**
- * AI-powered domain classification using Google Gemini
+ * AI-powered domain classification using OpenRouter
  * Analyzes project descriptions and classifies into relevant technology domains
  * 
  * @param {string} text - Project description text
@@ -21,7 +21,6 @@ export const extractDomains = async (text) => {
             return ['General'];
         }
 
-        // Construct the prompt for Gemini
         const prompt = `You are an expert technology classifier for a hackathon platform. 
         
 Analyze the following project description and classify it into ONE OR MORE of these domains:
@@ -44,10 +43,25 @@ ${text}
 
 DOMAINS:`;
 
-        // Call Gemini API
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const output = response.text().trim();
+        const response = await axios.post(OPENROUTER_API_URL, {
+            model: 'meta-llama/llama-3.3-70b-instruct:free',
+            messages: [
+                { role: 'system', content: 'You are a technology classifier. Respond only with domain names, comma-separated.' },
+                { role: 'user', content: prompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 100
+        }, {
+            headers: {
+                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'http://localhost:5000',
+                'X-Title': 'Hackathon Platform'
+            },
+            timeout: 30000
+        });
+
+        const output = response.data.choices[0].message.content.trim();
 
         // Parse the response
         const domains = output
@@ -55,7 +69,6 @@ DOMAINS:`;
             .map(d => d.trim())
             .filter(d => ['AI', 'Web', 'Blockchain', 'Cloud', 'IoT', 'Data', 'General'].includes(d));
 
-        // Return domains or fallback to General
         if (domains.length === 0) {
             console.warn('AI classification returned no valid domains, using General');
             return ['General'];
@@ -65,9 +78,7 @@ DOMAINS:`;
         return domains;
 
     } catch (error) {
-        console.error('AI domain extraction error:', error);
-
-        // Fallback to simple keyword matching if AI fails
+        console.error('AI domain extraction error:', error.message);
         console.warn('Falling back to keyword-based classification');
         return fallbackKeywordExtraction(text);
     }
@@ -75,7 +86,6 @@ DOMAINS:`;
 
 /**
  * Fallback keyword-based extraction if AI fails
- * This ensures the system still works even if Gemini API is down
  */
 const fallbackKeywordExtraction = (text) => {
     const lowerText = text.toLowerCase();

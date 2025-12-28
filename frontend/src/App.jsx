@@ -25,9 +25,13 @@ import OrganizerDashboard from './pages/organizer/OrganizerDashboard';
 import CreateHackathon from './pages/organizer/CreateHackathon';
 import Analytics from './pages/organizer/Analytics';
 import CheckIn from './pages/organizer/CheckIn';
+import ProjectSubmissions from './pages/organizer/ProjectSubmissions';
 
 // Mentor pages
 import MentorDashboard from './pages/mentor/MentorDashboard';
+
+// Shared pages
+import Settings from './pages/shared/Settings';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -170,6 +174,14 @@ function App() {
                             </>
                         }
                     />
+                    <Route
+                        path="/settings"
+                        element={
+                            <ProtectedRoute requiredRole="participant">
+                                <Settings role="participant" />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* Organizer routes */}
                     <Route
@@ -197,10 +209,26 @@ function App() {
                         }
                     />
                     <Route
+                        path="/organizer/submissions"
+                        element={
+                            <ProtectedRoute requiredRole="organizer">
+                                <ProjectSubmissions />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/organizer/checkin"
                         element={
                             <ProtectedRoute requiredRole="organizer">
                                 <CheckIn />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/organizer/settings"
+                        element={
+                            <ProtectedRoute requiredRole="organizer">
+                                <Settings role="organizer" />
                             </ProtectedRoute>
                         }
                     />

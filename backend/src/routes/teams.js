@@ -17,6 +17,7 @@ import {
     getUser
 } from '../services/firestore.js';
 import { createTeamInviteNotification } from '../services/notificationService.js';
+import { extractDomains } from '../utils/aiDomainExtractor.js';
 
 const router = express.Router();
 
@@ -235,6 +236,11 @@ router.post('/:id/idea-submit', authenticate, isParticipant, async (req, res) =>
             return res.status(400).json({ error: 'Title and description are required' });
         }
 
+        // Use AI to automatically extract tech stack from description
+        console.log('🤖 Extracting tech domains from idea description...');
+        const detectedDomains = await extractDomains(description);
+        console.log('✅ Detected domains:', detectedDomains);
+
         // Update team with idea submission (pptUrl is optional)
         const ideaSubmission = {
             title,
@@ -243,13 +249,14 @@ router.post('/:id/idea-submit', authenticate, isParticipant, async (req, res) =>
             submittedAt: new Date().toISOString()
         };
 
-        // Merge with existing submissions
+        // Merge with existing submissions and update tags with AI-detected domains
         const existingSubmissions = team.submissions || {};
         await updateTeam(req.params.id, {
             submissions: {
                 ...existingSubmissions,
                 idea: ideaSubmission
-            }
+            },
+            tags: detectedDomains // AI-detected tech stack tags
         });
 
         res.json({ message: 'Idea submitted successfully' });

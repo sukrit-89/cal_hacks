@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trophy, Calendar, Users, Bell, Target, QrCode } from 'lucide-react';
+import { Trophy, Calendar, Users, Bell, Target, QrCode, Github } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useTeamStore } from '../../stores/teamStore';
 import { Card } from '../../components/ui/Card';
@@ -156,6 +156,14 @@ export const ParticipantDashboard = () => {
                                                     <Button variant="secondary" size="sm" className="w-full flex items-center justify-center gap-2">
                                                         <QrCode className="w-4 h-4" />
                                                         View QR Code
+                                                    </Button>
+                                                </Link>
+                                            )}
+                                            {team.rsvpStatus && (
+                                                <Link to={`/teams/${team.id}/final`} className="flex-1">
+                                                    <Button size="sm" className="w-full flex items-center justify-center gap-2">
+                                                        <Github className="w-4 h-4" />
+                                                        Submit Project
                                                     </Button>
                                                 </Link>
                                             )}

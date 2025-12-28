@@ -1,10 +1,60 @@
 import axios from 'axios';
+import dotenv from 'dotenv';
 
-// AI Evaluation API endpoint
-const AI_EVAL_API_URL = 'https://express-app-morphvm-is5bih0g.http.cloud.morph.so/start';
+dotenv.config();
+
+// OpenRouter API configuration
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API;
+
+// Retry delays in milliseconds
+const RETRY_DELAYS = [3000, 8000, 15000]; // 3s, 8s, 15s
 
 /**
- * Pre-evaluate a team using the AI evaluation API
+ * Sleep helper function
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Call OpenRouter API with retry logic
+ */
+const callOpenRouterWithRetry = async (messages, maxRetries = 3) => {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await axios.post(OPENROUTER_API_URL, {
+                model: 'meta-llama/llama-3.3-70b-instruct:free', // Free model
+                messages: messages,
+                temperature: 0.3,
+                max_tokens: 1024
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'http://localhost:5000',
+                    'X-Title': 'Hackathon Platform'
+                },
+                timeout: 60000
+            });
+
+            return response.data.choices[0].message.content.trim();
+        } catch (error) {
+            const isRateLimit = error.response?.status === 429 ||
+                error.message.includes('429') ||
+                error.message.includes('rate');
+
+            if (isRateLimit && attempt < maxRetries) {
+                const delay = RETRY_DELAYS[attempt] || 15000;
+                console.log(`⏳ Rate limited. Retrying in ${delay / 1000}s... (attempt ${attempt + 1}/${maxRetries})`);
+                await sleep(delay);
+            } else {
+                throw error;
+            }
+        }
+    }
+};
+
+/**
+ * Pre-evaluate a team using OpenRouter AI
  * @param {Object} teamData - Team data including members, idea, bios
  * @param {Object} weights - Scoring weights { github, resume, idea, bios }
  * @returns {Promise<Object>} Evaluation results
@@ -18,15 +68,7 @@ export const preEvaluateTeam = async (teamData, weights) => {
         if (teamData.teamBios && Array.isArray(teamData.teamBios)) {
             teamData.teamBios.forEach(member => {
                 if (member.githubUrl) {
-                    // Ensure proper GitHub URL format
-                    let githubUrl = member.githubUrl;
-                    if (!githubUrl.startsWith('http')) {
-                        githubUrl = `https://github.com/${githubUrl}`;
-                    }
-                    if (!githubUrl.endsWith('/')) {
-                        githubUrl += '/';
-                    }
-                    githubUrls.push(githubUrl);
+                    githubUrls.push(member.githubUrl);
                 }
             });
         }
@@ -40,73 +82,95 @@ export const preEvaluateTeam = async (teamData, weights) => {
                 }
             });
         }
-        const biosText = biosArray.join('. ') || 'No bios provided.';
+        const biosText = biosArray.length > 0 ? biosArray.join('. ') : 'No bios provided.';
 
         // Get idea description
         const ideaDescription = teamData.submissions?.idea?.description ||
             teamData.submissions?.idea?.title ||
             'No idea description provided.';
 
-        // Get resume info (using bios as resume proxy if no dedicated resume)
-        const resumeText = teamData.resumeSummary ||
-            biosArray.join('. ') ||
-            'No resume information available.';
+        // Get idea title
+        const ideaTitle = teamData.submissions?.idea?.title || 'Untitled Project';
 
-        // Convert weights from 0-100 format to match API expectations
-        // The API expects weights like: { github: 30, resume: 20, idea: 40, bios: 10 }
-        const apiWeights = {
-            github: weights.github || weights.complexity || 30,
-            resume: weights.resume || weights.design || 20,
-            idea: weights.idea || weights.innovation || 40,
-            bios: weights.bios || weights.pitch || 10
-        };
+        // Build the prompt
+        const prompt = `You are an expert hackathon judge evaluating a team's application. 
+        
+Evaluate this team based on the following criteria and provide scores from 0-100 for each:
 
-        // Prepare request body
-        const requestBody = {
-            githubs: JSON.stringify(githubUrls.length > 0 ? githubUrls : ["https://github.com/example/"]),
-            resume: resumeText,
-            idea: ideaDescription,
-            bios: biosText,
-            weights: JSON.stringify(apiWeights),
-            temperature: 0.3,
-            maxTokens: 1024
-        };
+TEAM: ${teamData.teamName}
 
-        console.log('📤 Sending to AI API:', {
-            githubs: githubUrls,
-            ideaPreview: ideaDescription.substring(0, 100) + '...',
-            biosPreview: biosText.substring(0, 100) + '...',
-            weights: apiWeights
-        });
+PROJECT IDEA TITLE: ${ideaTitle}
 
-        // Call the AI evaluation API
-        const response = await axios.post(AI_EVAL_API_URL, requestBody, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            timeout: 60000 // 60 second timeout
-        });
+PROJECT IDEA DESCRIPTION:
+${ideaDescription}
 
-        const aiResult = response.data;
-        console.log('📥 AI API Response:', JSON.stringify(aiResult, null, 2));
+TEAM MEMBER GITHUB PROFILES: ${githubUrls.length > 0 ? githubUrls.join(', ') : 'Not provided'}
 
-        // Extract scores - handle various possible response formats
-        const githubScore = aiResult.githubScore ?? aiResult.github ?? aiResult.scores?.github ?? 0;
-        const resumeScore = aiResult.resumeScore ?? aiResult.resume ?? aiResult.scores?.resume ?? 0;
-        const ideaScore = aiResult.ideaScore ?? aiResult.idea ?? aiResult.scores?.idea ?? 0;
-        const biosScore = aiResult.biosScore ?? aiResult.bios ?? aiResult.scores?.bios ?? 0;
+TEAM MEMBER BIOS:
+${biosText}
 
-        // Calculate total using weights
-        const totalScore = aiResult.totalScore ?? aiResult.total ?? Math.round(
-            (githubScore * (apiWeights.github / 100)) +
-            (resumeScore * (apiWeights.resume / 100)) +
-            (ideaScore * (apiWeights.idea / 100)) +
-            (biosScore * (apiWeights.bios / 100))
+SCORING CRITERIA:
+1. GITHUB (Weight: ${weights.github}%): Evaluate based on the GitHub profiles provided. Consider: profile completeness, repositories, activity, and technical skills shown.
+2. RESUME/SKILLS (Weight: ${weights.resume}%): Evaluate based on team member bios and their described skills, experience, and background.
+3. IDEA (Weight: ${weights.idea}%): Evaluate the project idea based on: innovation, feasibility, impact, and market potential.
+4. BIOS (Weight: ${weights.bios}%): Evaluate the team composition: diversity of skills, team synergy, and overall team strength.
+
+IMPORTANT: You must respond ONLY with a valid JSON object in this exact format (no markdown, no extra text):
+{
+    "github": <score 0-100>,
+    "resume": <score 0-100>,
+    "idea": <score 0-100>,
+    "bios": <score 0-100>,
+    "reasoning": {
+        "github": "<brief 1-2 sentence explanation>",
+        "resume": "<brief 1-2 sentence explanation>",
+        "idea": "<brief 1-2 sentence explanation>",
+        "bios": "<brief 1-2 sentence explanation>"
+    }
+}`;
+
+        console.log('📤 Sending evaluation request to OpenRouter...');
+
+        const messages = [
+            { role: 'system', content: 'You are an expert hackathon judge. Respond only with valid JSON.' },
+            { role: 'user', content: prompt }
+        ];
+
+        const output = await callOpenRouterWithRetry(messages);
+
+        console.log('📥 OpenRouter raw response:', output.substring(0, 200) + '...');
+
+        // Parse the JSON response
+        let aiResult;
+        try {
+            const jsonMatch = output.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                aiResult = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('No JSON found in response');
+            }
+        } catch (parseError) {
+            console.error('Failed to parse OpenRouter response:', parseError.message);
+            console.log('Raw output:', output);
+            throw new Error('Failed to parse AI response');
+        }
+
+        // Extract scores with validation
+        const githubScore = Math.min(100, Math.max(0, parseInt(aiResult.github) || 50));
+        const resumeScore = Math.min(100, Math.max(0, parseInt(aiResult.resume) || 50));
+        const ideaScore = Math.min(100, Math.max(0, parseInt(aiResult.idea) || 50));
+        const biosScore = Math.min(100, Math.max(0, parseInt(aiResult.bios) || 50));
+
+        // Calculate weighted total
+        const totalScore = Math.round(
+            (githubScore * (weights.github / 100)) +
+            (resumeScore * (weights.resume / 100)) +
+            (ideaScore * (weights.idea / 100)) +
+            (biosScore * (weights.bios / 100))
         );
 
-        console.log('📊 Parsed Scores:', { githubScore, resumeScore, ideaScore, biosScore, totalScore });
+        console.log('✅ OpenRouter evaluation complete:', { githubScore, resumeScore, ideaScore, biosScore, totalScore });
 
-        // Map API response to our format
         return {
             teamId: teamData.id,
             scores: {
@@ -115,7 +179,6 @@ export const preEvaluateTeam = async (teamData, weights) => {
                 idea: ideaScore,
                 bios: biosScore,
                 total: totalScore,
-                // Also map to legacy field names for compatibility
                 innovation: ideaScore,
                 complexity: githubScore,
                 design: resumeScore,
@@ -133,49 +196,38 @@ export const preEvaluateTeam = async (teamData, weights) => {
                 idea: aiResult.reasoning?.idea || 'Idea analyzed',
                 bio: aiResult.reasoning?.bios || 'Team bios assessed'
             },
+            source: 'OPENROUTER_AI',
             timestamp: new Date().toISOString()
         };
     } catch (error) {
-        console.error('AI Pre-evaluation error:', error.message);
-
-        // If API fails, use fallback mock evaluation
-        console.log('⚠️ Using fallback mock evaluation');
-        return mockPreEvaluateTeam(teamData, weights);
+        console.error('❌ OpenRouter AI evaluation failed:', error.message);
+        console.log('⚠️ FALLBACK: Using consistent fallback scores');
+        return consistentFallbackEvaluation(teamData, weights);
     }
 };
 
 /**
- * Final evaluation for a team (same API, different context)
+ * Final evaluation for a team using OpenRouter
  */
 export const finalEvaluateTeam = async (teamData, weights) => {
     try {
         console.log('🤖 AI Final Evaluation started for team:', teamData.teamName);
 
-        // For final evaluation, we focus more on the final submission
+        const repoUrl = teamData.submissions?.final?.repositoryUrl || '';
+        const projectDescription = teamData.submissions?.final?.projectDescription ||
+            teamData.submissions?.idea?.description ||
+            'No project description provided.';
+
         const githubUrls = [];
-
-        // If team has a GitHub repo submission, use that
-        if (teamData.submissions?.final?.repoUrl) {
-            githubUrls.push(teamData.submissions.final.repoUrl);
-        }
-
-        // Also include member GitHubs
+        if (repoUrl) githubUrls.push(repoUrl);
         if (teamData.teamBios && Array.isArray(teamData.teamBios)) {
             teamData.teamBios.forEach(member => {
                 if (member.githubUrl) {
-                    let githubUrl = member.githubUrl;
-                    if (!githubUrl.startsWith('http')) {
-                        githubUrl = `https://github.com/${githubUrl}`;
-                    }
-                    if (!githubUrl.endsWith('/')) {
-                        githubUrl += '/';
-                    }
-                    githubUrls.push(githubUrl);
+                    githubUrls.push(member.githubUrl);
                 }
             });
         }
 
-        // Extract bios
         const biosArray = [];
         if (teamData.teamBios && Array.isArray(teamData.teamBios)) {
             teamData.teamBios.forEach((member, index) => {
@@ -184,57 +236,77 @@ export const finalEvaluateTeam = async (teamData, weights) => {
                 }
             });
         }
-        const biosText = biosArray.join('. ') || 'No bios provided.';
+        const biosText = biosArray.length > 0 ? biosArray.join('. ') : 'No bios provided.';
 
-        // Get final submission description or idea
-        const ideaDescription = teamData.submissions?.final?.description ||
-            teamData.submissions?.idea?.description ||
-            'No project description provided.';
+        const prompt = `You are an expert hackathon judge evaluating a team's FINAL project submission.
 
-        const resumeText = teamData.resumeSummary || biosArray.join('. ') || 'No resume information.';
+TEAM: ${teamData.teamName}
 
-        const apiWeights = {
-            github: weights.github || weights.complexity || 30,
-            resume: weights.resume || weights.design || 20,
-            idea: weights.idea || weights.innovation || 40,
-            bios: weights.bios || weights.pitch || 10
-        };
+PROJECT REPOSITORY: ${repoUrl || 'Not provided'}
 
-        const requestBody = {
-            githubs: JSON.stringify(githubUrls.length > 0 ? githubUrls : ["https://github.com/example/"]),
-            resume: resumeText,
-            idea: ideaDescription,
-            bios: biosText,
-            weights: JSON.stringify(apiWeights),
-            temperature: 0.3,
-            maxTokens: 1024
-        };
+PROJECT DESCRIPTION:
+${projectDescription}
 
-        const response = await axios.post(AI_EVAL_API_URL, requestBody, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            timeout: 60000
-        });
+TEAM GITHUB PROFILES: ${githubUrls.length > 0 ? githubUrls.join(', ') : 'Not provided'}
 
-        const aiResult = response.data;
-        console.log('📥 AI Final Evaluation Response:', JSON.stringify(aiResult, null, 2));
+TEAM MEMBER BIOS:
+${biosText}
 
-        // Extract scores - handle various possible response formats
-        const githubScore = aiResult.githubScore ?? aiResult.github ?? aiResult.scores?.github ?? 0;
-        const resumeScore = aiResult.resumeScore ?? aiResult.resume ?? aiResult.scores?.resume ?? 0;
-        const ideaScore = aiResult.ideaScore ?? aiResult.idea ?? aiResult.scores?.idea ?? 0;
-        const biosScore = aiResult.biosScore ?? aiResult.bios ?? aiResult.scores?.bios ?? 0;
+SCORING CRITERIA:
+1. GITHUB/CODE (Weight: ${weights.github}%): Evaluate the repository quality, code organization, commits, and technical implementation.
+2. TECHNICAL SKILLS (Weight: ${weights.resume}%): Evaluate the technical complexity and skills demonstrated in the project.
+3. IDEA/INNOVATION (Weight: ${weights.idea}%): Evaluate innovation, creativity, problem-solving, and potential impact.
+4. TEAM EXECUTION (Weight: ${weights.bios}%): Evaluate how well the team executed their vision and documented their work.
 
-        // Calculate total using weights
-        const totalScore = aiResult.totalScore ?? aiResult.total ?? Math.round(
-            (githubScore * (apiWeights.github / 100)) +
-            (resumeScore * (apiWeights.resume / 100)) +
-            (ideaScore * (apiWeights.idea / 100)) +
-            (biosScore * (apiWeights.bios / 100))
+IMPORTANT: Respond ONLY with a valid JSON object:
+{
+    "github": <score 0-100>,
+    "resume": <score 0-100>,
+    "idea": <score 0-100>,
+    "bios": <score 0-100>,
+    "reasoning": {
+        "github": "<brief explanation>",
+        "resume": "<brief explanation>",
+        "idea": "<brief explanation>",
+        "bios": "<brief explanation>"
+    }
+}`;
+
+        console.log('📤 Sending final evaluation request to OpenRouter...');
+
+        const messages = [
+            { role: 'system', content: 'You are an expert hackathon judge. Respond only with valid JSON.' },
+            { role: 'user', content: prompt }
+        ];
+
+        const output = await callOpenRouterWithRetry(messages);
+
+        let aiResult;
+        try {
+            const jsonMatch = output.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                aiResult = JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('No JSON found in response');
+            }
+        } catch (parseError) {
+            console.error('Failed to parse OpenRouter response:', parseError.message);
+            throw new Error('Failed to parse AI response');
+        }
+
+        const githubScore = Math.min(100, Math.max(0, parseInt(aiResult.github) || 50));
+        const resumeScore = Math.min(100, Math.max(0, parseInt(aiResult.resume) || 50));
+        const ideaScore = Math.min(100, Math.max(0, parseInt(aiResult.idea) || 50));
+        const biosScore = Math.min(100, Math.max(0, parseInt(aiResult.bios) || 50));
+
+        const totalScore = Math.round(
+            (githubScore * (weights.github / 100)) +
+            (resumeScore * (weights.resume / 100)) +
+            (ideaScore * (weights.idea / 100)) +
+            (biosScore * (weights.bios / 100))
         );
 
-        console.log('📊 Final Parsed Scores:', { githubScore, resumeScore, ideaScore, biosScore, totalScore });
+        console.log('✅ OpenRouter final evaluation complete:', { githubScore, resumeScore, ideaScore, biosScore, totalScore });
 
         return {
             teamId: teamData.id,
@@ -244,51 +316,54 @@ export const finalEvaluateTeam = async (teamData, weights) => {
                 idea: ideaScore,
                 bios: biosScore,
                 total: totalScore,
-                // Legacy mappings
-                codeQuality: aiResult.githubScore || 0,
-                innovation: aiResult.ideaScore || 0,
-                completeness: aiResult.resumeScore || 0,
-                documentation: aiResult.biosScore || 0
+                codeQuality: githubScore,
+                innovation: ideaScore,
+                completeness: resumeScore,
+                documentation: biosScore
             },
             reasoning: aiResult.reasoning || {},
             breakdown: {
                 github: aiResult.reasoning?.github || 'Repository analyzed',
                 resume: aiResult.reasoning?.resume || 'Technical skills evaluated',
                 idea: aiResult.reasoning?.idea || 'Project innovation assessed',
-                bio: aiResult.reasoning?.bios || 'Team composition reviewed'
+                bio: aiResult.reasoning?.bios || 'Team execution reviewed'
             },
+            source: 'OPENROUTER_AI',
             timestamp: new Date().toISOString()
         };
     } catch (error) {
-        console.error('AI Final evaluation error:', error.message);
-        console.log('⚠️ Using fallback mock evaluation');
-        return mockFinalEvaluateTeam(teamData, weights);
+        console.error('❌ OpenRouter Final evaluation failed:', error.message);
+        console.log('⚠️ FALLBACK: Using consistent fallback scores');
+        return consistentFallbackEvaluation(teamData, weights);
     }
 };
 
 /**
- * Fallback mock evaluation when API fails
+ * Consistent fallback evaluation using hash-based scores
  */
-const mockPreEvaluateTeam = (teamData, weights) => {
-    console.log('🎭 Mock Pre-Evaluation for team:', teamData.teamName);
+const consistentFallbackEvaluation = (teamData, weights) => {
+    console.log('🔧 Generating consistent fallback scores for team:', teamData.teamName);
 
-    const githubScore = Math.floor(Math.random() * 30 + 60);
-    const resumeScore = Math.floor(Math.random() * 30 + 55);
-    const ideaScore = Math.floor(Math.random() * 30 + 65);
-    const biosScore = Math.floor(Math.random() * 30 + 50);
+    const hashString = `${teamData.id}-${teamData.teamName}-${teamData.submissions?.idea?.title || ''}`;
+    let hash = 0;
+    for (let i = 0; i < hashString.length; i++) {
+        const char = hashString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
 
-    const apiWeights = {
-        github: weights.github || weights.complexity || 30,
-        resume: weights.resume || weights.design || 20,
-        idea: weights.idea || weights.innovation || 40,
-        bios: weights.bios || weights.pitch || 10
-    };
+    const baseScore = Math.abs(hash % 31) + 60;
+
+    const githubScore = Math.min(90, Math.max(60, baseScore + (hash % 10)));
+    const resumeScore = Math.min(90, Math.max(60, baseScore + ((hash >> 8) % 10)));
+    const ideaScore = Math.min(90, Math.max(60, baseScore + ((hash >> 16) % 10)));
+    const biosScore = Math.min(90, Math.max(60, baseScore + ((hash >> 24) % 10)));
 
     const totalScore = Math.round(
-        (githubScore * (apiWeights.github / 100)) +
-        (resumeScore * (apiWeights.resume / 100)) +
-        (ideaScore * (apiWeights.idea / 100)) +
-        (biosScore * (apiWeights.bios / 100))
+        (githubScore * (weights.github / 100)) +
+        (resumeScore * (weights.resume / 100)) +
+        (ideaScore * (weights.idea / 100)) +
+        (biosScore * (weights.bios / 100))
     );
 
     return {
@@ -305,56 +380,18 @@ const mockPreEvaluateTeam = (teamData, weights) => {
             pitch: biosScore
         },
         reasoning: {
-            github: 'GitHub profiles analyzed (mock evaluation)',
-            resume: 'Resume skills evaluated (mock evaluation)',
-            idea: 'Project idea assessed (mock evaluation)',
-            bios: 'Team bios reviewed (mock evaluation)'
+            github: 'GitHub profile evaluation (fallback mode)',
+            resume: 'Skills assessment (fallback mode)',
+            idea: 'Project idea analysis (fallback mode)',
+            bios: 'Team composition review (fallback mode)'
         },
         breakdown: {
-            github: `Analyzed ${teamData.members?.length || 0} GitHub profiles`,
+            github: `Analyzed team GitHub presence`,
             resume: `Evaluated team skills`,
-            idea: 'Idea presentation analyzed',
-            bio: 'Team composition assessed'
+            idea: 'Project concept assessed',
+            bio: 'Team dynamics reviewed'
         },
-        timestamp: new Date().toISOString()
-    };
-};
-
-const mockFinalEvaluateTeam = (teamData, weights) => {
-    console.log('🎭 Mock Final Evaluation for team:', teamData.teamName);
-
-    const githubScore = Math.floor(Math.random() * 30 + 70);
-    const resumeScore = Math.floor(Math.random() * 30 + 65);
-    const ideaScore = Math.floor(Math.random() * 30 + 75);
-    const biosScore = Math.floor(Math.random() * 30 + 60);
-
-    const totalScore = Math.round((githubScore + resumeScore + ideaScore + biosScore) / 4);
-
-    return {
-        teamId: teamData.id,
-        scores: {
-            github: githubScore,
-            resume: resumeScore,
-            idea: ideaScore,
-            bios: biosScore,
-            total: totalScore,
-            codeQuality: githubScore,
-            innovation: ideaScore,
-            completeness: resumeScore,
-            documentation: biosScore
-        },
-        reasoning: {
-            github: 'Repository code quality analyzed (mock evaluation)',
-            resume: 'Technical implementation reviewed (mock evaluation)',
-            idea: 'Innovation assessed (mock evaluation)',
-            bios: 'Documentation evaluated (mock evaluation)'
-        },
-        breakdown: {
-            github: 'GitHub repository analyzed',
-            resume: 'Technical skills evaluated',
-            idea: 'Project innovation assessed',
-            bio: 'Team execution reviewed'
-        },
+        source: 'CONSISTENT_FALLBACK',
         timestamp: new Date().toISOString()
     };
 };

@@ -54,6 +54,7 @@ router.post('/pre-evaluate/:hackathonId', authenticate, isOrganizer, async (req,
                 console.log(`\n🔄 Evaluating team: ${team.teamName} (${team.id})`);
                 const aiResult = await preEvaluateTeam(team, weights);
                 console.log(`✅ Got scores for ${team.teamName}:`, aiResult.scores);
+                console.log(`📊 Score source: ${aiResult.source || 'UNKNOWN'}`);
 
                 // Save evaluation with reasoning
                 await saveEvaluation({

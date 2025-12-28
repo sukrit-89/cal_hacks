@@ -95,6 +95,16 @@ export const OrganizerDashboard = () => {
         }
     };
 
+    const handleToggleSubmissions = async () => {
+        try {
+            const response = await api.put(`/hackathons/${selectedHackathon.id}/toggle-submissions`);
+            fetchHackathons({ organizerId: user.id });
+            alert(response.data.message);
+        } catch (error) {
+            alert('Failed to toggle submissions');
+        }
+    };
+
     // Calculate stats
     const totalApplications = teams.length;
     const pendingReview = teams.filter(t => t.status === 'pending').length;
@@ -149,6 +159,13 @@ export const OrganizerDashboard = () => {
                                 <option value="live">Live</option>
                                 <option value="closed">Closed</option>
                             </select>
+                            <Button
+                                variant={selectedHackathon.submissionsOpen ? "secondary" : "primary"}
+                                size="sm"
+                                onClick={handleToggleSubmissions}
+                            >
+                                {selectedHackathon.submissionsOpen ? '🟢 Submissions Open' : '🔴 Open Submissions'}
+                            </Button>
                         </div>
                     )}
                 </div>

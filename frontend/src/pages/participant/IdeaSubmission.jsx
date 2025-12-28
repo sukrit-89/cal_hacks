@@ -225,6 +225,14 @@ export const IdeaSubmission = () => {
                                     💡 Tip: Mention specific technologies (AI, Web, Blockchain, Cloud, IoT, Data) to help us assign relevant mentors!
                                 </p>
                             </div>
+
+                            <Input
+                                label="Tech Stack"
+                                value={formData.techStack}
+                                onChange={(e) => setFormData({ ...formData, techStack: e.target.value })}
+                                placeholder="e.g., React, Node.js, Python, AI/ML, Firebase"
+                                helperText="Comma-separated list of technologies you'll use"
+                            />
                         </div>
                     </Card>
 

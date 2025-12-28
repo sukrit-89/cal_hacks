@@ -138,4 +138,33 @@ router.delete('/:id', authenticate, isOrganizer, async (req, res) => {
     }
 });
 
+// Toggle project submissions (organizer only)
+router.put('/:id/toggle-submissions', authenticate, isOrganizer, async (req, res) => {
+    try {
+        const hackathon = await getHackathon(req.params.id);
+
+        if (!hackathon) {
+            return res.status(404).json({ error: 'Hackathon not found' });
+        }
+
+        if (hackathon.organizerId !== req.user.uid) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Toggle the submissionsOpen flag
+        const newStatus = !hackathon.submissionsOpen;
+        await updateHackathon(req.params.id, { submissionsOpen: newStatus });
+
+        console.log(`📝 Submissions ${newStatus ? 'opened' : 'closed'} for hackathon: ${hackathon.title}`);
+
+        res.json({
+            message: `Submissions ${newStatus ? 'opened' : 'closed'} successfully`,
+            submissionsOpen: newStatus
+        });
+    } catch (error) {
+        console.error('Toggle submissions error:', error);
+        res.status(500).json({ error: 'Failed to toggle submissions' });
+    }
+});
+
 export default router;

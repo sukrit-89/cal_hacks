@@ -8,7 +8,8 @@ import {
     BarChart3,
     FolderKanban,
     LogOut,
-    QrCode
+    QrCode,
+    FileText
 } from 'lucide-react';
 import { cn } from '../../utils/helpers';
 import { useAuthStore } from '../../stores/authStore';
@@ -27,9 +28,8 @@ export const Sidebar = ({ role = 'participant' }) => {
     const organizerLinks = [
         { to: '/organizer/dashboard', icon: LayoutDashboard, label: 'Overview' },
         { to: '/organizer/create', icon: Plus, label: 'Create Hackathon' },
-        { to: '/organizer/applications', icon: Users, label: 'Applications' },
+        { to: '/organizer/submissions', icon: FileText, label: 'Project Submissions' },
         { to: '/organizer/checkin', icon: QrCode, label: 'Check-In' },
-        { to: '/organizer/scoring', icon: BarChart3, label: 'Scoring' },
         { to: '/organizer/analytics', icon: BarChart3, label: 'Analytics' },
         { to: '/organizer/settings', icon: Settings, label: 'Settings' }
     ];
