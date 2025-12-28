@@ -64,6 +64,13 @@ export const Signup = () => {
                 formData.role
             );
 
+            // Check if user object exists and has a role
+            if (!user || !user.role) {
+                console.error('Signup returned invalid user object:', user);
+                setError('Failed to complete registration. Please try again.');
+                return;
+            }
+
             // Redirect based on role
             if (user.role === 'organizer') {
                 navigate('/organizer/dashboard');

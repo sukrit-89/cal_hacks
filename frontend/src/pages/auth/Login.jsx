@@ -18,6 +18,13 @@ export const Login = () => {
         try {
             const user = await signIn(email, password);
 
+            // Check if user object exists and has a role
+            if (!user || !user.role) {
+                console.error('Sign in returned invalid user object:', user);
+                setError('Failed to sign in. Please try again.');
+                return;
+            }
+
             // Redirect based on role
             if (user.role === 'organizer') {
                 navigate('/organizer/dashboard');
