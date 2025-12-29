@@ -452,16 +452,10 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 📝 License
-
-This project is licensed under the MIT License.
-
----
-
 ## 👨‍💻 Author
 
-**Sukrit Goswami**
-**Druhin Mitra**
+**Sukrit Goswami**,
+**Druhin Mitra** &
 **Surya Chakraborty**
 
 - GitHub: [@SukritGoswami](https://github.com/sukrit-89),[@DruhinMitra](https://github.com/DruhinMitra),[@SuryaChakraborty](https://github.com/surya-chakraborty)
