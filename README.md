@@ -461,8 +461,10 @@ This project is licensed under the MIT License.
 ## 👨‍💻 Author
 
 **Sukrit Goswami**
+**Druhin Mitra**
+**Surya Chakraborty**
 
-- GitHub: [@sukrit-89](https://github.com/sukrit-89)
+- GitHub: [@SukritGoswami](https://github.com/sukrit-89),[@DruhinMitra](https://github.com/DruhinMitra),[@SuryaChakraborty](https://github.com/surya-chakraborty)
 - LinkedIn: [Sukrit Goswami](https://www.linkedin.com/in/sukrit-goswami-5b1b6b211/)
 
 ---
@@ -473,14 +475,6 @@ This project is licensed under the MIT License.
 - **Google Gemini** - AI Evaluations
 - **Cloudinary** - File Storage
 - **Vercel & Render** - Hosting
-
----
-
-## 📞 Support
-
-For issues and questions:
-- 🐛 [Open an Issue](https://github.com/sukrit-89/cal_hacks/issues)
-- 💬 [Discussions](https://github.com/sukrit-89/cal_hacks/discussions)
 
 ---
 
