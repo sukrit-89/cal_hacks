@@ -2,10 +2,17 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const parseOrigins = (origins) => {
+    if (!origins) return ['http://localhost:5173', 'http://localhost:5174'];
+    if (Array.isArray(origins)) return origins;
+    // Parse comma-separated string or single string
+    return origins.includes(',') ? origins.split(',').map(o => o.trim()) : [origins.trim()];
+};
+
 export const config = {
     port: process.env.PORT || 5000,
     nodeEnv: process.env.NODE_ENV || 'development',
-    corsOrigin: process.env.CORS_ORIGIN || ['http://localhost:5173', 'http://localhost:5174'],
+    corsOrigin: parseOrigins(process.env.CORS_ORIGIN),
 
     firebase: {
         projectId: process.env.FIREBASE_PROJECT_ID,
